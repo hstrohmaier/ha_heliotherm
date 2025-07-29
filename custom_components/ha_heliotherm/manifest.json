@@ -11,6 +11,6 @@
   "requirements": ["pymodbus"],
   "ssdp": [],
   "translations": "translations",
-  "version": "v1.0.39",
+  "version": "v1.0.41",
   "zeroconf": []
 }
