@@ -11,12 +11,12 @@ import homeassistant.helpers.config_validation as cv
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, CONF_DEVICE
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN, DEFAULT_NAME, DEFAULT_PORT
+from .const import DOMAIN, DEFAULT_NAME, DEFAULT_PORT, DEFAULT_HOSTID, CONF_HOSTID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,7 +24,8 @@ DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NAME, default=DEFAULT_NAME): cv.string,
         vol.Required(CONF_HOST): cv.string,
-        vol.Required(CONF_PORT, default=DEFAULT_PORT): cv.string,
+        vol.Required(CONF_PORT, default=DEFAULT_PORT): cv.port,
+        vol.Required(CONF_HOSTID, default=DEFAULT_HOSTID): int,
     }
 )
 
@@ -118,7 +119,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     ): cv.string,
                     vol.Required(
                         CONF_PORT, default=self.config_entry.data[CONF_PORT]
-                    ): cv.string,
+                    ): cv.port,
+                    vol.Required(
+                        CONF_HOSTID, default=self.config_entry.data[CONF_HOSTID]
+                    ): int,
                 }
             ),
         )

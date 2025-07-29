@@ -27,6 +27,8 @@ DOMAIN = "ha_heliotherm"
 DEFAULT_NAME = "Heliotherm Heatpump"
 DEFAULT_SCAN_INTERVAL = 15
 DEFAULT_PORT = 502
+DEFAULT_HOSTID = 1
+CONF_HOSTID = "hostid"
 CONF_HALEIOTHERM_HUB = "haheliotherm_hub"
 ATTR_MANUFACTURER = "Heliotherm"
 

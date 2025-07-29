@@ -21,6 +21,7 @@ from homeassistant.const import (
     CONF_NAME,
     CONF_PORT,
     CONF_SCAN_INTERVAL,
+    CONF_DEVICE,
     Platform,
 )
 from homeassistant.core import HomeAssistant, callback
@@ -28,7 +29,8 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
 
 
-from .const import DEFAULT_NAME, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import DEFAULT_NAME, DEFAULT_SCAN_INTERVAL, DOMAIN, CONF_HOSTID
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,14 +46,17 @@ async def async_setup(hass, config):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up a HaHeliotherm modbus."""
+    _LOGGER.debug(entry)
     host = entry.data[CONF_HOST]
     name = entry.data[CONF_NAME]
     port = entry.data[CONF_PORT]
+    hostid = entry.data[CONF_HOSTID]
+	
     scan_interval = DEFAULT_SCAN_INTERVAL
 
     _LOGGER.debug("Setup %s.%s", DOMAIN, name)
 
-    hub = HaHeliothermModbusHub(hass, name, host, port, scan_interval)
+    hub = HaHeliothermModbusHub(hass, name, host, port, scan_interval, hostid)
     # """Register the hub."""
     hass.data[DOMAIN][name] = {"hub": hub}
 
@@ -87,6 +92,7 @@ class HaHeliothermModbusHub:
         host,
         port,
         scan_interval,
+        hostid,
     ):
         """Initialize the Modbus hub."""
         self._hass = hass
@@ -94,6 +100,7 @@ class HaHeliothermModbusHub:
         self._lock = threading.Lock()
         self._name = name
         self._scan_interval = timedelta(seconds=scan_interval)
+        self._hostid = hostid
         self._unsub_interval_method = None
         self._sensors = []
         self.data = {}
@@ -147,10 +154,10 @@ class HaHeliothermModbusHub:
         with self._lock:
             self._client.connect()
 
-    def read_input_registers(self, slave, address, count):
+    def read_input_registers(self, address, count):
         """Read holding registers."""
         with self._lock:
-            return self._client.read_input_registers(address, count=count, slave=slave)
+            return self._client.read_input_registers(address, count=count, slave=self._hostid)
 
     def getsignednumber(self, number, bitlength=16):
         mask = (2**bitlength) - 1
@@ -244,35 +251,30 @@ class HaHeliothermModbusHub:
         betriebsart_nr = self.getbetriebsartnr(betriebsart)
         if betriebsart_nr is None:
             return
-        self._client.write_register(address=100, value=betriebsart_nr, slave=1)
-        await self.async_refresh_modbus_data()
-
-    async def set_mkr1_betriebsart(self, betriebsart: str):
-        betriebsart_nr = self.getbetriebsartnr(betriebsart)
-        if betriebsart_nr is None:
-            return
-        self._client.write_register(address=107, value=betriebsart_nr, slave=1)
-        await self.async_refresh_modbus_data()
-
-    async def set_mkr2_betriebsart(self, betriebsart: str):
-        betriebsart_nr = self.getbetriebsartnr(betriebsart)
-        if betriebsart_nr is None:
-            return
-        self._client.write_register(address=112, value=betriebsart_nr, slave=1)
+        self._client.write_register(address=100, value=betriebsart_nr, slave=self._hostid)
         await self.async_refresh_modbus_data()
 
     async def set_raumtemperatur(self, temperature: float):
         if temperature is None:
             return
         temp_int = int(temperature * 10)
-        self._client.write_register(address=101, value=temp_int, slave=1)
+        self._client.write_register(address=101, value=temp_int, slave=self._hostid)
+        await self.async_refresh_modbus_data()
+
+    async def set_rl_soll(self, temperature: float):
+        if temperature is None:
+            return
+        temp_int = int(temperature * 10)
+        temp_activate_rl_soll = 1
+        self._client.write_register(address=102, value=temp_int, slave=self._hostid)
+        self._client.write_register(address=103, value=temp_activate_rl_soll, slave=self._hostid)
         await self.async_refresh_modbus_data()
 
     async def set_rltkuehlen(self, temperature: float):
         if temperature is None:
             return
         temp_int = int(temperature * 10)
-        self._client.write_register(address=104, value=temp_int, slave=1)
+        self._client.write_register(address=104, value=temp_int, slave=self._hostid)
         await self.async_refresh_modbus_data()
 
     async def set_ww_bereitung(self, temp_min: float, temp_max: float):
@@ -280,27 +282,32 @@ class HaHeliothermModbusHub:
             return
         temp_max_int = int(temp_max * 10)
         temp_min_int = int(temp_min * 10)
-        self._client.write_register(address=105, value=temp_max_int, slave=1)
-        self._client.write_register(address=106, value=temp_min_int, slave=1)
+        self._client.write_register(address=105, value=temp_max_int, slave=self._hostid)
+        self._client.write_register(address=106, value=temp_min_int, slave=self._hostid)
         await self.async_refresh_modbus_data()
 
-#---------------------eingefügt-------------------------------------------------
-    async def set_rl_soll(self, temperature: float):
-        if temperature is None:
+    async def set_mkr1_betriebsart(self, betriebsart: str):
+        betriebsart_nr = self.getbetriebsartnr(betriebsart)
+        if betriebsart_nr is None:
             return
-        temp_int = int(temperature * 10)
-        temp_activate_rl_soll = 1
-        self._client.write_register(address=102, value=temp_int, slave=1)
-        self._client.write_register(address=103, value=temp_activate_rl_soll, slave=1)
+        self._client.write_register(address=107, value=betriebsart_nr, slave=self._hostid)
         await self.async_refresh_modbus_data()
+
+    async def set_mkr2_betriebsart(self, betriebsart: str):
+        betriebsart_nr = self.getbetriebsartnr(betriebsart)
+        if betriebsart_nr is None:
+            return
+        self._client.write_register(address=112, value=betriebsart_nr, slave=self._hostid)
+        await self.async_refresh_modbus_data()
+
 #---------------------eingefügt-------------------------------------------------
 
     def read_modbus_registers(self):
         """Read from modbus registers"""
-        modbusdata = self.read_input_registers(slave=1, address=10, count=32)
-        modbusdata2 = self.read_input_registers(slave=1, address=60, count=16)
+        modbusdata = self.read_input_registers(address=10, count=32)
+        modbusdata2 = self.read_input_registers(address=60, count=16)
         modbusdata3 = self._client.read_holding_registers(
-            address=100, count=27, slave=1
+            address=100, count=27, slave=self._hostid
         )
 
         # if modbusdata.isError():
