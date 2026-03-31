@@ -433,11 +433,18 @@ class MyModbusHub:
                     count=C_MAX_INPUT_REGISTER - C_MIN_INPUT_REGISTER + 1,
                     device_id=self._hostid,
                 )
-                if modbusdata_input is None or not hasattr(
-                    modbusdata_input, "registers"
-                ):
-                    _LOGGER.error("Fehler beim Lesen der Input-Register.")
+                if modbusdata_input is None:
+                    _LOGGER.error("Fehler beim Lesen der Input-Register: keine Antwort (None).")
                     return False
+
+                if not hasattr(modbusdata_input, "registers"):
+                    _LOGGER.error("Fehler beim Lesen der Input-Register: ungültige Antwortstruktur.")
+                    return False
+
+                if not modbusdata_input.registers:
+                    _LOGGER.error("Fehler beim Lesen der Input-Register: leere Antwort.")
+                    return False
+
                 _LOGGER.debug(
                     f"{len(modbusdata_input.registers)} Input-Register: {modbusdata_input.registers}"
                 )
@@ -456,11 +463,18 @@ class MyModbusHub:
                     count=C_MAX_HOLDING_REGISTER - C_MIN_HOLDING_REGISTER + 1,
                     device_id=self._hostid,
                 )
-                if modbusdata_holding is None or not hasattr(
-                    modbusdata_holding, "registers"
-                ):
-                    _LOGGER.error("Fehler beim Lesen der Holding-Register.")
+                if modbusdata_holding is None:
+                    _LOGGER.error("Fehler beim Lesen der Holding-Register: keine Antwort (None).")
                     return False
+
+                if not hasattr(modbusdata_holding, "registers"):
+                    _LOGGER.error("Fehler beim Lesen der Holding-Register: ungültige Antwortstruktur.")
+                    return False
+
+                if not modbusdata_holding.registers:
+                    _LOGGER.error("Fehler beim Lesen der Holding-Register: leere Antwort.")
+                    return False
+
                 _LOGGER.debug(
                     f"{len(modbusdata_holding.registers)} Holding-Register: {modbusdata_holding.registers}"
                 )
@@ -477,9 +491,18 @@ class MyModbusHub:
                     count=C_MAX_COILS - C_MIN_COILS + 1,
                     device_id=self._hostid,
                 )
-                if modbusdata_coils is None or not hasattr(modbusdata_coils, "bits"):
-                    _LOGGER.error("Fehler beim Lesen der Coils.")
+                if modbusdata_coils is None:
+                    _LOGGER.error("Fehler beim Lesen der Coils: keine Antwort (None).")
                     return False
+
+                if not hasattr(modbusdata_coils, "bits"):
+                    _LOGGER.error("Fehler beim Lesen der Coils: ungültige Antwortstruktur.")
+                    return False
+
+                if not modbusdata_coils.bits:
+                    _LOGGER.error("Fehler beim Lesen der Coils: leere Antwort.")
+                    return False
+
                 _LOGGER.debug(
                     f"{len(modbusdata_coils.bits)} Coils: {modbusdata_coils.bits}"
                 )
@@ -498,11 +521,18 @@ class MyModbusHub:
                     count=C_MAX_DISCRETE_INPUTS - C_MIN_DISCRETE_INPUTS + 1,
                     device_id=self._hostid,
                 )
-                if modbusdata_discrete is None or not hasattr(
-                    modbusdata_discrete, "bits"
-                ):
-                    _LOGGER.error("Fehler beim Lesen der Discrete Inputs.")
+                if modbusdata_discrete is None:
+                    _LOGGER.error("Fehler beim Lesen der Discrete Inputs: keine Antwort (None).")
                     return False
+
+                if not hasattr(modbusdata_discrete, "bits"):
+                    _LOGGER.error("Fehler beim Lesen der Discrete Inputs: ungültige Antwortstruktur.")
+                    return False
+
+                if not modbusdata_discrete.bits:
+                    _LOGGER.error("Fehler beim Lesen der Discrete Inputs: leere Antwort.")
+                    return False
+
                 _LOGGER.debug(
                     f"{len(modbusdata_discrete.bits)} Discrete Inputs: {modbusdata_discrete.bits}"
                 )
