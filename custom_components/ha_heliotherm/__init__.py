@@ -382,7 +382,7 @@ class MyModbusHub:
             value_ha = 1
             _LOGGER.info(f"Schreibe Hand-Aktiv in {entity_ha} -> {value_ha}")
             if reg_ha and (dt_ha == ModbusTcpClient.DATATYPE.UINT16):
-                await self._client.write_register(address=reg_ha, value=value_ha, device_id=self._hostid)
+                await self._write_modbus_registers(reg_ha, (value_ha,), dt_ha)
             else:
                 raise ValueError(f"Fehlende/fehlerhafte Registerdefinition für {entity_ha}.")
         # 4) Daten neu lesen
