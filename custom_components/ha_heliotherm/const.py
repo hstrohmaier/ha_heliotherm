@@ -692,6 +692,15 @@ def init():
     thismodule.NUMBER_TYPES = {}
     thismodule.BINARY_TYPES = {}
     ha_entities = []
+    # Companion entities referenced via "HA" are normally kept internal and therefore
+    # do not become visible Home Assistant entities. That model is problematic for
+    # Rücklaufsolltemperatur: writing REG 102 only makes sense together with REG 103
+    # (Hand-Aktiv), and without a visible way to switch REG 103 back to 0 the user
+    # cannot reliably return that path to Automatik from HA. For now we expose only
+    # this one companion entity as the narrowest fix for the known 102/103 issue
+    # discussed in mbuchber/ha_heliotherm#68, without flooding HA with every other
+    # hand_aktiv helper before their UX/behavior is reviewed.
+    exposed_companion_entities = {C_RUECKLAUFSOLLTEMPERATUR_HAND_AKTIV}
 
     for c_key, props in ENTITIES_DICT.items():
         entity_key: str = c_key
@@ -702,7 +711,7 @@ def init():
         if entity_ha:
             ha_entities.append(entity_ha)
 
-        if entity_key not in ha_entities:
+        if entity_key not in ha_entities or entity_key in exposed_companion_entities:
 
             match registerclass:
                 case thismodule.MySensorEntityDescription:
