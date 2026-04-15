@@ -245,7 +245,10 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
     C_VIERWEGENVENTIL_ABTAUBETRIEB: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"Vierwegenventil Abtaubetrieb","REG":27,"DT":C_DT_INT16,"SWITCH":{"off":0},"WEB_ID":"MP 32"},
     C_WMZ_DURCHFLUSS: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"WMZ Durchfluss","REG":28,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"l/min","WEB_ID":"MP 85"},
     C_N_SOLL_VERDICHTER: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"n-Soll Verdichter","REG":29,"DT":C_DT_INT16,"FAKTOR":1,"UNIT":"‰","WEB_ID":"MP 90"},
-    C_COP: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"COP","REG":30,"DT":C_DT_INT16,"FAKTOR":0.1,"WEB_ID":"MP 92"},
+    # COP is dimensionless, but HA renders a proper history graph only if the entity
+    # carries measurement metadata. Mirroring the original integration, we keep an
+    # explicit empty unit here so _unit_mapping() yields state_class=measurement.
+    C_COP: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"COP","REG":30,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"","WEB_ID":"MP 92"},
     C_TEMP_FRISCHWASSER: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"Temp. Frischwasser","REG":31,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","WEB_ID":"MP 11"},
     C_EVU_SPERRE_AKTIV: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"EVU Sperre aktiv","REG":32,"DT":C_DT_INT16,"SWITCH":{"off":0},"WEB_ID":"MP 37"},
     C_TEMP_AUSSEN_VERZOEGERT: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"Temp. Aussen verzögert","REG":33,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","WEB_ID":"MP 1"},
