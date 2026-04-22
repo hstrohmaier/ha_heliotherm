@@ -372,7 +372,7 @@ class MyModbusHub:
             reg_words = self._client.convert_to_registers(value=raw, data_type=dt)
 
         # 2) Schreiben (run blocking modbus in executor)
-        await self._write_modbus_registers(reg, reg_words, dt)
+        await self._hass.async_add_executor_job(self._write_modbus_registers, reg, reg_words, dt)
 
         # 3) Hand-Aktiv setzen
         entity_ha = get_entity_ha(props)
@@ -382,7 +382,7 @@ class MyModbusHub:
             value_ha = 1
             _LOGGER.info(f"Schreibe Hand-Aktiv in {entity_ha} -> {value_ha}")
             if reg_ha and (dt_ha == ModbusTcpClient.DATATYPE.UINT16):
-                await self._client.write_register(address=reg_ha, value=value_ha, device_id=self._hostid)
+                await self._hass.async_add_executor_job(self._write_modbus_registers, reg_ha, (value_ha,), dt_ha)
             else:
                 raise ValueError(f"Fehlende/fehlerhafte Registerdefinition für {entity_ha}.")
         # 4) Daten neu lesen
@@ -583,7 +583,7 @@ class MyModbusHub:
 
     # ***************************************** SCHREIBEN **************************************************************
 
-    async def _write_modbus_registers(
+    def _write_modbus_registers(
         self, base_reg: int, reg_values: Iterable[int], dt: ModbusTcpClient.DATATYPE
     ):
         """
@@ -595,24 +595,24 @@ class MyModbusHub:
         """
         _LOGGER.info(f"Schreibzugriff auf Register {base_reg}: {reg_values}")
 
+        with self._lock:
+            if not self._client.connect():
+                _LOGGER.warning("Modbus connect failed")
+                return
 
-        if not self._client.connect():
-            _LOGGER.warning("Modbus connect failed")
-            return
-
-        try:
-            for offset, word in enumerate(reg_values):
-                if dt == ModbusTcpClient.DATATYPE.BITS:
-                    self._client.write_coil(
-                        address=base_reg + offset,
-                        value=bool(word),
-                        device_id=self._hostid,
-                    )
-                else:
-                    self._client.write_register(
-                        address=base_reg + offset,
-                        value=int(word) & 0xFFFF,
-                        device_id=self._hostid,
-                    )
-        finally:
-            self._client.close()
+            try:
+                for offset, word in enumerate(reg_values):
+                    if dt == ModbusTcpClient.DATATYPE.BITS:
+                        self._client.write_coil(
+                            address=base_reg + offset,
+                            value=bool(word),
+                            device_id=self._hostid,
+                        )
+                    else:
+                        self._client.write_register(
+                            address=base_reg + offset,
+                            value=int(word) & 0xFFFF,
+                            device_id=self._hostid,
+                        )
+            finally:
+                self._client.close()

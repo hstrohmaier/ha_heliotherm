@@ -245,7 +245,10 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
     C_VIERWEGENVENTIL_ABTAUBETRIEB: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"Vierwegenventil Abtaubetrieb","REG":27,"DT":C_DT_INT16,"SWITCH":{"off":0},"WEB_ID":"MP 32"},
     C_WMZ_DURCHFLUSS: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"WMZ Durchfluss","REG":28,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"l/min","WEB_ID":"MP 85"},
     C_N_SOLL_VERDICHTER: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"n-Soll Verdichter","REG":29,"DT":C_DT_INT16,"FAKTOR":1,"UNIT":"‰","WEB_ID":"MP 90"},
-    C_COP: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"COP","REG":30,"DT":C_DT_INT16,"FAKTOR":0.1,"WEB_ID":"MP 92"},
+    # COP is dimensionless, but HA renders a proper history graph only if the entity
+    # carries measurement metadata. Mirroring the original integration, we keep an
+    # explicit empty unit here so _unit_mapping() yields state_class=measurement.
+    C_COP: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"COP","REG":30,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"","WEB_ID":"MP 92"},
     C_TEMP_FRISCHWASSER: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"Temp. Frischwasser","REG":31,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","WEB_ID":"MP 11"},
     C_EVU_SPERRE_AKTIV: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"EVU Sperre aktiv","REG":32,"DT":C_DT_INT16,"SWITCH":{"off":0},"WEB_ID":"MP 37"},
     C_TEMP_AUSSEN_VERZOEGERT: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"Temp. Aussen verzögert","REG":33,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","WEB_ID":"MP 1"},
@@ -692,6 +695,15 @@ def init():
     thismodule.NUMBER_TYPES = {}
     thismodule.BINARY_TYPES = {}
     ha_entities = []
+    # Companion entities referenced via "HA" are normally kept internal and therefore
+    # do not become visible Home Assistant entities. That model is problematic for
+    # Rücklaufsolltemperatur: writing REG 102 only makes sense together with REG 103
+    # (Hand-Aktiv), and without a visible way to switch REG 103 back to 0 the user
+    # cannot reliably return that path to Automatik from HA. For now we expose only
+    # this one companion entity as the narrowest fix for the known 102/103 issue
+    # discussed in mbuchber/ha_heliotherm#68, without flooding HA with every other
+    # hand_aktiv helper before their UX/behavior is reviewed.
+    exposed_companion_entities = {C_RUECKLAUFSOLLTEMPERATUR_HAND_AKTIV}
 
     for c_key, props in ENTITIES_DICT.items():
         entity_key: str = c_key
@@ -702,7 +714,7 @@ def init():
         if entity_ha:
             ha_entities.append(entity_ha)
 
-        if entity_key not in ha_entities:
+        if (entity_key not in ha_entities) or (entity_key in exposed_companion_entities):
 
             match registerclass:
                 case thismodule.MySensorEntityDescription:
