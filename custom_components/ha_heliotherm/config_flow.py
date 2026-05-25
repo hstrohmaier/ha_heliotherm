@@ -24,8 +24,11 @@ from .const import (
     DEFAULT_NAME,
     DEFAULT_PORT,
     DEFAULT_HOSTID,
+    DEFAULT_FIRMWARE,
     DEFAULT_SCAN_INTERVAL,
     CONF_HOSTID,
+    CONF_FIRMWARE,
+
 )
 
 import sys
@@ -36,6 +39,11 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
 _LOGGER.info(f"{thismodule} loaded.")
 
+FIRMWARE_OPTIONS = [
+    "2.1.0.5",
+    "2.2.0.1",
+]
+
 DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NAME, default=DEFAULT_NAME): cv.string,
@@ -43,8 +51,10 @@ DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): cv.port,
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
         vol.Optional(CONF_HOSTID, default=DEFAULT_HOSTID): int,
+        vol.Optional(CONF_FIRMWARE, default=DEFAULT_FIRMWARE): vol.In(FIRMWARE_OPTIONS),
     }
 )
+
 
 
 def host_valid(host):
@@ -158,6 +168,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             self._config_entry.data.get(CONF_HOSTID, DEFAULT_HOSTID),
                         ),
                     ): vol.Coerce(int),
+                    vol.Optional(
+                        CONF_FIRMWARE,
+                        default=self._config_entry.options.get(
+                            CONF_FIRMWARE, 
+                            self._config_entry.data.get(CONF_FIRMWARE, DEFAULT_FIRMWARE),
+                        ),
+                    ): vol.In(FIRMWARE_OPTIONS),
                 }
             ),
         )

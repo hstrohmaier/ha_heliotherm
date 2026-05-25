@@ -35,13 +35,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     CONF_HOSTID,
-    ENTITIES_DICT,
-    BINARYSENSOR_TYPES,
-    SENSOR_TYPES,
-    SELECT_TYPES,
-    CLIMATE_TYPES,
-    NUMBER_TYPES,
-    BINARY_TYPES,
+    CONF_FIRMWARE,
     get_entity_switch,
     get_entity_type,
     get_entity_select,
@@ -55,14 +49,6 @@ from .const import (
     is_entity_switch,
     is_entity_select,
     is_entity_climate,
-    C_MIN_INPUT_REGISTER,
-    C_MAX_INPUT_REGISTER,
-    C_MIN_HOLDING_REGISTER,
-    C_MAX_HOLDING_REGISTER,
-    C_MIN_COILS,
-    C_MAX_COILS,
-    C_MIN_DISCRETE_INPUTS,
-    C_MAX_DISCRETE_INPUTS,
 )
 
 
@@ -111,6 +97,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         hostid = DEFAULT_HOSTID
 
     _LOGGER.info("Setup %s.%s", DOMAIN, name)
+
+    version = entry.options.get(CONF_FIRMWARE, None)
+    #version = await hub.detect_firmware_version()
+    _LOGGER.info(f"Firmware-Version: {version}")
+    const.init(version, force=True)
 
     hub = MyModbusHub(hass, name, host, port, scan_interval, hostid)
     # """Register the hub."""
@@ -334,7 +325,7 @@ class MyModbusHub:
         props = get_entity_props(entity_key)
         if not props:
             raise ValueError(
-                f"Ungültige Entität {entity_key}. Definition in ENTITIES_DICT nicht gefunden."
+                f"Ungültige Entität {entity_key}. Definition in const.ENTITIES_DICT nicht gefunden."
             )
         if is_entity_readonly(props):
             raise PermissionError(f"Register {entity_key} ist read-only.")
@@ -423,14 +414,14 @@ class MyModbusHub:
     def read_modbus_registers(self):
         """Read from modbus registers"""
 
-        if C_MAX_INPUT_REGISTER >= C_MIN_INPUT_REGISTER:
+        if const.C_MAX_INPUT_REGISTER >= const.C_MIN_INPUT_REGISTER:
             _LOGGER.debug(
-                f"Lese Input-Register {C_MIN_INPUT_REGISTER} bis {C_MAX_INPUT_REGISTER}..."
+                f"Lese Input-Register {const.C_MIN_INPUT_REGISTER} bis {const.C_MAX_INPUT_REGISTER}..."
             )
             with self._lock:
                 modbusdata_input = self._client.read_input_registers(
-                    address=C_MIN_INPUT_REGISTER,
-                    count=C_MAX_INPUT_REGISTER - C_MIN_INPUT_REGISTER + 1,
+                    address=const.C_MIN_INPUT_REGISTER,
+                    count=const.C_MAX_INPUT_REGISTER - const.C_MIN_INPUT_REGISTER + 1,
                     device_id=self._hostid,
                 )
                 if modbusdata_input is None:
@@ -453,14 +444,14 @@ class MyModbusHub:
             _LOGGER.debug("Keine Input-Register definiert.")
             input_regs = None
 
-        if C_MAX_HOLDING_REGISTER >= C_MIN_HOLDING_REGISTER:
+        if const.C_MAX_HOLDING_REGISTER >= const.C_MIN_HOLDING_REGISTER:
             _LOGGER.debug(
-                f"Lese Holding-Register {C_MIN_HOLDING_REGISTER} bis {C_MAX_HOLDING_REGISTER}..."
+                f"Lese Holding-Register {const.C_MIN_HOLDING_REGISTER} bis {const.C_MAX_HOLDING_REGISTER}..."
             )
             with self._lock:
                 modbusdata_holding = self._client.read_holding_registers(
-                    address=C_MIN_HOLDING_REGISTER,
-                    count=C_MAX_HOLDING_REGISTER - C_MIN_HOLDING_REGISTER + 1,
+                    address=const.C_MIN_HOLDING_REGISTER,
+                    count=const.C_MAX_HOLDING_REGISTER - const.C_MIN_HOLDING_REGISTER + 1,
                     device_id=self._hostid,
                 )
                 if modbusdata_holding is None:
@@ -483,12 +474,12 @@ class MyModbusHub:
             _LOGGER.debug("Keine Holding-Register definiert.")
             holding_regs = None
 
-        if C_MAX_COILS >= C_MIN_COILS:
-            _LOGGER.debug(f"Lese Coils {C_MIN_COILS} bis {C_MAX_COILS}...")
+        if const.C_MAX_COILS >= const.C_MIN_COILS:
+            _LOGGER.debug(f"Lese Coils {const.C_MIN_COILS} bis {const.C_MAX_COILS}...")
             with self._lock:
                 modbusdata_coils = self._client.read_coils(
-                    address=C_MIN_COILS,
-                    count=C_MAX_COILS - C_MIN_COILS + 1,
+                    address=const.C_MIN_COILS,
+                    count=const.C_MAX_COILS - const.C_MIN_COILS + 1,
                     device_id=self._hostid,
                 )
                 if modbusdata_coils is None:
@@ -511,14 +502,14 @@ class MyModbusHub:
             _LOGGER.debug("Keine Coils definiert.")
             coils = None
 
-        if C_MAX_DISCRETE_INPUTS >= C_MIN_DISCRETE_INPUTS:
+        if const.C_MAX_DISCRETE_INPUTS >= const.C_MIN_DISCRETE_INPUTS:
             _LOGGER.debug(
-                f"Lese Discrete Inputs {C_MIN_DISCRETE_INPUTS} bis {C_MAX_DISCRETE_INPUTS} ..."
+                f"Lese Discrete Inputs {const.C_MIN_DISCRETE_INPUTS} bis {const.C_MAX_DISCRETE_INPUTS} ..."
             )
             with self._lock:
                 modbusdata_discrete = self._client.read_discrete_inputs(
-                    address=C_MIN_DISCRETE_INPUTS,
-                    count=C_MAX_DISCRETE_INPUTS - C_MIN_DISCRETE_INPUTS + 1,
+                    address=const.C_MIN_DISCRETE_INPUTS,
+                    count=const.C_MAX_DISCRETE_INPUTS - const.C_MIN_DISCRETE_INPUTS + 1,
                     device_id=self._hostid,
                 )
                 if modbusdata_discrete is None:
@@ -541,7 +532,7 @@ class MyModbusHub:
             _LOGGER.debug("Keine Discrete Inputs definiert.")
             discrete = None
 
-        for entity_key, props in ENTITIES_DICT.items():
+        for entity_key, props in const.ENTITIES_DICT.items():
             reg_type = get_entity_type(props)
             reg, dt = get_entity_reg(props)
             if reg is None:
@@ -549,18 +540,18 @@ class MyModbusHub:
             _LOGGER.debug(f"Lese Entität '{entity_key}'.")
             match reg_type:
                 case const.C_REG_TYPE_COILS:
-                    raw = self.read_entity_value(coils, reg - C_MIN_COILS, dt)
+                    raw = self.read_entity_value(coils, reg - const.C_MIN_COILS, dt)
                 case const.C_REG_TYPE_DISCRETE_INPUTS:
                     raw = self.read_entity_value(
-                        discrete, reg - C_MIN_DISCRETE_INPUTS, dt
+                        discrete, reg - const.C_MIN_DISCRETE_INPUTS, dt
                     )
                 case const.C_REG_TYPE_INPUT_REGISTERS:
                     raw = self.read_entity_value(
-                        input_regs, reg - C_MIN_INPUT_REGISTER, dt
+                        input_regs, reg - const.C_MIN_INPUT_REGISTER, dt
                     )
                 case const.C_REG_TYPE_HOLDING_REGISTERS:
                     raw = self.read_entity_value(
-                        holding_regs, reg - C_MIN_HOLDING_REGISTER, dt
+                        holding_regs, reg - const.C_MIN_HOLDING_REGISTER, dt
                     )
 
             if is_entity_switch(props):

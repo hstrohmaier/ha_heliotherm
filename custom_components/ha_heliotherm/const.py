@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Callable, Awaitable
+from copy import deepcopy
+from packaging.version import Version, InvalidVersion
 
 import sys
 
@@ -49,7 +51,9 @@ DEFAULT_NAME = "Heliotherm Heatpump"
 DEFAULT_SCAN_INTERVAL = 15
 DEFAULT_PORT = 502
 DEFAULT_HOSTID = 1
+DEFAULT_FIRMWARE = "1.2.0.5"
 CONF_HOSTID = "hostid"
+CONF_FIRMWARE = "firmware"
 CONF_HUB = "haheliotherm_hub"
 ATTR_MANUFACTURER = "Heliotherm"
 
@@ -191,6 +195,14 @@ C_EVU_SPERRE_HAND_AKTIV = "switch_evu_sperre_hand_aktiv"
 C_TF22_HANDWERT = "input_tf22_handwert"
 C_TF22_HAND_AKTIV = "switch_tf22_hand_aktiv"
 
+## BEGIN Neu ab Firmware 2.2.0.1
+C_FWS_ZIELTEMPERATUR = "climate_fws_zieltemperatur"
+C_RAUMFUEHLER_1_HANDWERT = "climate_raumfuehler_1_handwert"
+C_RAUMFUEHLER_1_HAND_AKTIV = "switch_raumfuehler_1_hand_aktiv"
+C_ZIRKULATIONSPUMPE_WW_HANDWERT = "switch_zirkulationspumpe_ww_handwert"
+C_ZIRKULATIONSPUMPE_WW_HAND_AKTIV = "switch_zirkulationspumpe_ww_hand_aktiv"
+## END Neu ab Firmware 2.2.0.1
+
 
 # --------------------------------------------------------------------------------------------
 # 2) ENTITIES_DICT DICT, neue Register müssen nur hier zugefügt werden.
@@ -219,10 +231,12 @@ C_TF22_HAND_AKTIV = "switch_tf22_hand_aktiv"
 # --------------------------------------------------------------------------------------------
 
 # Modbus-Register gemäß 20230705_Fachmannebene_RCGX_1.0.5.4_DE_mail.pdf vom 24.04.2023
-# Getestet mit Heliotherm Complete RCG 2.1.0.5 und Visualisierung 2.1.0.5
+# Änderungen nur über ENTITY_PATCHES!!
+# --- ENTITIES_DICT --- wird über init() gesetzt.
+ENTITIES_DICT: Dict[str, Dict[str, Any]] = {}
 
-# --- ENTITIES_DICT ---
-ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
+# BASE_ENTITIES_DICT entspricht RCG 2.1.0.5
+BASE_ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
     # INPUT_REGISTERS
     # --- 0-9 werden aktuell nicht genutzt ---
     C_TEMP_AUSSEN: {"RT": C_REG_TYPE_INPUT_REGISTERS,"NAME":"Temp. Aussen","REG":10,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","WEB_ID":"MP 0"},
@@ -301,13 +315,13 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
     C_MKR2_SOLLTEMPERATUR_HAND_AKTIV: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"MKR2 Solltemperatur Hand-Aktiv","REG":115,"DT":C_DT_UINT16,"SWITCH":{"off":0,"on":1},"WEB_ID":"MP 72"},
     C_MKR2_MIN_RUECKLAUFTEMPERATUR_KUEHLEN: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"MKR2 min Rücklauftemperatur Kühlen","REG":116,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","STEP":1.0,"MIN":15.0,"MAX":25.0,"WEB_ID":"SP 352","PF":Platform.NUMBER},
     C_PV_ANFORDERUNG: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Anforderung","REG":117,"DT":C_DT_UINT16,"SWITCH":{"off":0,"on":1},"WEB_ID":"SP 436"},
-    C_PV_HEIZEN_OFFSET: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Heizen Offset","REG":118,"DT":C_DT_UINT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 437","PF":Platform.NUMBER},
-    C_PV_KUEHLEN_OFFSET: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Kuehlen Offset","REG":119,"DT":C_DT_UINT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 438","PF":Platform.NUMBER},
-    C_PV_HEIZEN_OFFSET_MKR1: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Heizen Offset MKR1","REG":120,"DT":C_DT_UINT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 453","PF":Platform.NUMBER},
-    C_PV_KUEHLEN_OFFSET_MKR1: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Kühlen Offset MKR1","REG":121,"DT":C_DT_UINT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 454","PF":Platform.NUMBER},
-    C_PV_HEIZEN_OFFSET_MKR2: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Heizen Offset MKR2","REG":122,"DT":C_DT_UINT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 455","PF":Platform.NUMBER},
-    C_PV_KUEHLEN_OFFSET_MKR2: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Kühlen Offset MKR2","REG":123,"DT":C_DT_UINT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 456","PF":Platform.NUMBER},
-    C_WW_NORMAL_MAX: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"WW Normal Max","REG":124,"DT":C_DT_UINT16,"FAKTOR":0.1,"UNIT":"°C","STEP":1.0,"MIN":5.0,"MAX":65.0,"WEB_ID":"SP 347","PF":Platform.NUMBER},
+    C_PV_HEIZEN_OFFSET: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Heizen Offset","REG":118,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 437","PF":Platform.NUMBER},
+    C_PV_KUEHLEN_OFFSET: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Kuehlen Offset","REG":119,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 438","PF":Platform.NUMBER},
+    C_PV_HEIZEN_OFFSET_MKR1: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Heizen Offset MKR1","REG":120,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 453","PF":Platform.NUMBER},
+    C_PV_KUEHLEN_OFFSET_MKR1: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Kühlen Offset MKR1","REG":121,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 454","PF":Platform.NUMBER},
+    C_PV_HEIZEN_OFFSET_MKR2: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Heizen Offset MKR2","REG":122,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 455","PF":Platform.NUMBER},
+    C_PV_KUEHLEN_OFFSET_MKR2: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"PV Kühlen Offset MKR2","REG":123,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"K","STEP":0.1,"MIN":0.0,"MAX":10.0,"WEB_ID":"SP 456","PF":Platform.NUMBER},
+    C_WW_NORMAL_MAX: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"WW Normal Max","REG":124,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","STEP":1.0,"MIN":5.0,"MAX":65.0,"WEB_ID":"SP 347","PF":Platform.NUMBER},
     C_VORGABE_LEISTUNGSAUFNAHME: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"Vorgabe Leistungsaufnahme","REG":125,"DT":C_DT_UINT16,"FAKTOR":1,"UNIT":"W","STEP":1,"MIN":0,"MAX":7000,"PF":Platform.NUMBER},   #MAX-Wert hängt von der LEistung der WP ab -> konfigurierbar machen?
     C_VORGABE_VERDICHTERDREHZAHL: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"Vorgabe Verdichterdrehzahl","REG":126,"RW":0,"DT":C_DT_INT16,"FAKTOR":1,"UNIT":"‰","STEP":1,"MIN":0,"MAX":1000,"PF":Platform.NUMBER},  #!! DARF NICHT BESCHRIEBEN WERDEN
     C_EXT_ANFORDERUNG: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"Ext. Anforderung","REG":127,"DT":C_DT_UINT16,"SWITCH":{"off":0,"on":1},"WEB_ID":"MP 27"},
@@ -339,6 +353,30 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
     C_TF22_HAND_AKTIV: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"TF22 Hand-Aktiv","REG":152,"DT":C_DT_UINT16,"SWITCH":{"off":0,"on":1},"WEB_ID":"MP 10"},
 }
 
+ENTITY_PATCHES = [
+    {
+        "min_version": "2.2.0.1",
+        "remove": [
+            C_MKR1_RUECKLAUFTEMPERATUR,
+            C_MKR2_RUECKLAUFTEMPERATUR,
+            C_WMZ_BRAUCHWASSER,
+            C_STROMZAEHLER_BRAUCHWASSER,
+        ],
+        "update": {
+            C_WMZ_DURCHFLUSS: {"FAKTOR": 0.1/60,},
+            C_N_SOLL_VERDICHTER: {"FAKTOR": 0.1, "UNIT": "%",},
+            C_EXPANSIONSVENTIL: {"UNIT": "%",},
+            C_TF22_HANDWERT: {"FAKTOR": 0.1, "UNIT": "°C",},
+        },
+        "add": {
+            C_FWS_ZIELTEMPERATUR: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"FWS Zieltemperatur","REG":153,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","STEP":1.0,"MIN":5.0,"MAX":65.0,"WEB_ID":"SP 87","PF":Platform.NUMBER},
+            C_RAUMFUEHLER_1_HANDWERT: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"Raumfühler 1 Handwert","REG":154,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","STEP":0.1,"MIN":-49.9,"MAX":60.0,"HA":C_RAUMFUEHLER_1_HAND_AKTIV,"WEB_ID":"MP 16","PF":Platform.NUMBER},
+            C_RAUMFUEHLER_1_HAND_AKTIV: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"Raumfühler 1 Hand-Aktiv","REG":155,"DT":C_DT_UINT16,"SWITCH":{"off":0,"on":1},"WEB_ID":"MP 16"},
+            C_ZIRKULATIONSPUMPE_WW_HANDWERT: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"Zirkulationspumpe WW Handwert","REG":156,"DT":C_DT_INT16,"SWITCH":{"off":0,"on":1},"HA":C_ZIRKULATIONSPUMPE_WW_HAND_AKTIV,"WEB_ID":"MP 29"},
+            C_ZIRKULATIONSPUMPE_WW_HAND_AKTIV: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"Zirkulationspumpe WW Hand-Aktiv","REG":157,"DT":C_DT_UINT16,"SWITCH":{"off":0,"on":1},"WEB_ID":"MP 29"},
+        },
+    },
+]
 
 # ------------------------------------------------------------
 # Klassendefinitionen für die unterschiedlichen Entitätstypen
@@ -670,30 +708,79 @@ def _unit_mapping(
     return u, None, SensorStateClass.MEASUREMENT
 
 
-_initialized = False
+def build_entities_dict(version: str | None) -> dict[str, dict]:
+    entities = deepcopy(BASE_ENTITIES_DICT)
 
+    if not version:
+        _LOGGER.debug("Keine Versionsnummer erkannt. Verwende Basis-Konfiguration.")
+        return entities
+    else:
+        _LOGGER.debug(f"Version {version} erkannt. Suche nach Patches...")
 
-def init():
+    try:
+        current = Version(version)
+    except InvalidVersion:
+        return entities
+
+    for patch in ENTITY_PATCHES:
+        min_version = patch["min_version"]
+        if current >= Version(min_version):
+            _LOGGER.debug(f"Wende Patch {min_version} an.")
+            for key in patch.get("remove", []):
+                entities.pop(key, None)
+
+            for key, changes in patch.get("update", {}).items():
+                if key not in entities:
+                    continue
+
+                for prop, value in changes.items():
+                    if value is None:
+                        entities[key].pop(prop, None)
+                    else:
+                        entities[key][prop] = value
+
+            entities.update(patch.get("add", {}))
+
+    return entities
+
+def init(detected_version:str|None = None, force: bool = False):
     global \
-        _initialized, \
+        ENTITIES_DICT, \
         BINARYSENSOR_TYPES, \
         SENSOR_TYPES, \
         SELECT_TYPES, \
         CLIMATE_TYPES, \
         NUMBER_TYPES, \
-        BINARY_TYPES
-    if _initialized:
-        return
+        BINARY_TYPES, \
+        C_MIN_INPUT_REGISTER, \
+        C_MAX_INPUT_REGISTER, \
+        C_MIN_HOLDING_REGISTER, \
+        C_MAX_HOLDING_REGISTER, \
+        C_MIN_COILS, \
+        C_MAX_COILS, \
+        C_MIN_DISCRETE_INPUTS, \
+        C_MAX_DISCRETE_INPUTS
+
+
     _LOGGER.info(
         "****************************************  initalizing ***************************************"
     )
 
-    thismodule.BINARYSENSOR_TYPES = {}
-    thismodule.SENSOR_TYPES = {}
-    thismodule.SELECT_TYPES = {}
-    thismodule.CLIMATE_TYPES = {}
-    thismodule.NUMBER_TYPES = {}
-    thismodule.BINARY_TYPES = {}
+    C_MIN_INPUT_REGISTER = sys.maxsize
+    C_MAX_INPUT_REGISTER = -1
+    C_MIN_HOLDING_REGISTER = sys.maxsize
+    C_MAX_HOLDING_REGISTER = -1
+    C_MIN_COILS = sys.maxsize
+    C_MAX_COILS = -1
+    C_MIN_DISCRETE_INPUTS = sys.maxsize
+    C_MAX_DISCRETE_INPUTS = -1
+
+    BINARYSENSOR_TYPES = {}
+    SENSOR_TYPES = {}
+    SELECT_TYPES = {}
+    CLIMATE_TYPES = {}
+    NUMBER_TYPES = {}
+    BINARY_TYPES = {}
     ha_entities = []
     # Companion entities referenced via "HA" are normally kept internal and therefore
     # do not become visible Home Assistant entities. That model is problematic for
@@ -704,6 +791,8 @@ def init():
     # discussed in mbuchber/ha_heliotherm#68, without flooding HA with every other
     # hand_aktiv helper before their UX/behavior is reviewed.
     exposed_companion_entities = {C_RUECKLAUFSOLLTEMPERATUR_HAND_AKTIV}
+
+    ENTITIES_DICT = build_entities_dict(detected_version)
 
     for c_key, props in ENTITIES_DICT.items():
         entity_key: str = c_key
@@ -811,7 +900,6 @@ def init():
         else:
             _LOGGER.debug(f"Hand-Aktiv-Schalter {entity_key} wird nur intern genutzt und nicht in HA bereitgestellt.")
 
-    _initialized = True
     _LOGGER.debug(
         f"Status-Register (r/o) von {C_MIN_INPUT_REGISTER} bis {C_MAX_INPUT_REGISTER}"
     )
@@ -832,5 +920,3 @@ def init():
         "****************************************  initalized ****************************************"
     )
 
-
-init()

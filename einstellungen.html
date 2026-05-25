@@ -1,0 +1,3097 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+
+
+<head>
+
+
+
+
+<link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" />
+	<title>WebControl</title>
+	<meta charset="utf-8" />
+
+	<!-- Modern HMI Components CSS -->
+	<link rel="stylesheet" href="/css/components.css" />
+	<!---<meta name="viewport" content="width=device-width, user-scalable=no">--->
+
+<!---<meta name="viewport" id="viewport-meta" content="user-scalable=no" /> --->
+
+<meta name="viewport" id="viewport-meta" content="user-scalable=no, initial-scale=1.0">
+
+
+
+
+
+
+	<style type="text/css">
+
+		@font-face {
+			font-family: 'Roboto';
+			src: url('/Roboto-Regular.ttf') format('truetype');
+			font-weight: normal;
+			font-style: normal;
+		}
+
+
+		html, body {
+			font-family: 'Roboto', sans-serif;
+			border: 0;
+			margin: 0;
+			height:100%;
+			width:100%;
+			position: absolute;
+			/* `overflow: clip` statt `hidden`: `hidden` erlaubt
+			   programmatisches Scrollen — was hier passiert (ein
+			   legacy #slideInFrames iframe ragt ~3 px über das
+			   Viewport, dann scrollt body um 6 px nach oben und
+			   hinterlässt am unteren Rand einen sichtbaren Streifen).
+			   `clip` richtet keinen Scroll-Container ein, also bleibt
+			   scrollTop dauerhaft 0. */
+			overflow: clip;
+		}
+
+		iframe {
+			overflow: hidden;
+		}
+
+		#logoContainer {
+			position: fixed;/*absolute;*/
+			width: 20%;
+			top: 10px;		/*5px/-100px/20px/30px*/
+			right: 15px;	/*5px/-50px/-40px*/
+			z-index: 1;
+			backdrop-filter: blur(5px);
+			-webkit-backdrop-filter: blur(5px);
+			border-radius: 50px;
+		}
+
+		/* Global circle containers (Edelweiß logo and Clock) */
+		.global-circle-container {
+			position: fixed;
+			z-index: 200;
+		}
+
+		#edelweissContainer {
+			top: 20px;
+			left: 20px;
+		}
+
+		#globalClockContainer {
+			bottom: 20px;
+			left: 20px;
+		}
+
+		.global-circle-container .circle-content {
+			width: 100px;
+			height: 100px;
+			border: 2px solid rgba(255, 255, 255, 0.3);
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: rgba(0, 0, 0, 0.2);
+		}
+
+		.global-circle-container .edelweiss-icon {
+			width: 100px;
+			height: 100px;
+			opacity: 0.95;
+		}
+
+		.global-circle-container .clock-content {
+			flex-direction: column;
+			text-align: center;
+		}
+
+		.global-circle-container .clock-content .date {
+			font-size: calc(14px * var(--hmi-scale));
+			font-weight: 400;
+			color: #ffffff;
+			line-height: 1.2;
+			letter-spacing: 0.5px;
+		}
+
+		.global-circle-container .clock-content .time {
+			font-size: calc(14px * var(--hmi-scale));
+			font-weight: 400;
+			color: #ffffff;
+			line-height: 1.2;
+			border-top: 1px solid rgba(255, 255, 255, 0.4);
+			padding-top: 4px;
+			margin-top: 4px;
+			min-width: 50px;
+		}
+
+		/* Responsive for global circles */
+		@media (max-width: 600px) {
+			.global-circle-container .circle-content {
+				width: 60px;
+				height: 60px;
+			}
+
+			.global-circle-container .edelweiss-icon {
+				width: 36px;
+				height: 36px;
+			}
+
+			.global-circle-container .clock-content .date,
+			.global-circle-container .clock-content .time {
+				font-size: calc(11px * var(--hmi-scale));
+			}
+		}
+
+		/* Status Indicator (Fehler circle) - top center, above header */
+		#statusIndicatorContainer {
+			position: fixed;
+			top: 0;
+			left: 50%;
+			transform: translateX(-50%);
+			z-index: 1100;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			gap: 10px;
+			background: rgba(40, 40, 40, 0.95);
+			padding: 8px 16px;
+			border-radius: 0 0 12px 12px;
+			border: 1px solid rgba(255, 255, 255, 0.15);
+			border-top: none;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		}
+
+		.status-circle {
+			width: 16px;
+			height: 16px;
+			border-radius: 50%;
+			background-color: #6ea439;
+			border: 2px solid rgba(255, 255, 255, 0.3);
+			flex-shrink: 0;
+			transition: background-color 0.3s ease;
+		}
+
+		.heating-rod-icon {
+			width: 50px;
+			height: 50px;
+		}
+
+		/* Status Text next to circle */
+		.status-tooltip {
+			color: #fff;
+			font-size: calc(14px * var(--hmi-scale));
+			font-weight: 500;
+			white-space: nowrap;
+		}
+
+		@media (max-width: 600px) {
+			#statusIndicatorContainer {
+				padding: 6px 12px;
+				gap: 8px;
+			}
+			#statusIndicatorContainer .heating-rod-icon {
+				width: 40px;
+				height: 40px;
+			}
+			#statusIndicatorContainer .status-tooltip {
+				font-size: calc(12px * var(--hmi-scale));
+			}
+		}
+
+		/* Status colors */
+		.status-circle.status-off {
+			background-color: #ffffff;
+		}
+
+		.status-circle.status-standby {
+			background-color: #ffeb0e;
+		}
+
+		.status-circle.status-standby-pulse {
+			background-color: #ffeb0e;
+		}
+
+		.status-circle.status-heizung {
+			background-color: #6ea439;
+		}
+
+		.status-circle.status-warmwasser {
+			background-color: #3b82f6;
+		}
+
+		.status-circle.status-kuehlen {
+			background-color: #06b6d4;
+		}
+
+		.status-circle.status-abtauung {
+			background-color: #ff8c00;
+		}
+
+		.status-circle.status-error {
+			background-color: #ff0000;
+		}
+
+		/* Blinking animation for standby-pulse (SP10=1-5, compressor starting) */
+		@keyframes statusBlink {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.3; }
+		}
+
+		.status-circle.status-standby-pulse {
+			animation: statusBlink 1s step-end infinite;
+		}
+
+		@media (max-width: 600px) {
+			.status-circle {
+				width: 12px;
+				height: 12px;
+			}
+		}
+
+		/* HTML Page Container for migrated pages */
+		#html-page-container {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			display: none;
+			z-index: 100;
+		}
+
+		#html-page-container.active {
+			display: block;
+		}
+
+		/* Update Notification Container - right side middle */
+		#updateNotification {
+			position: fixed;
+			right: 40px;
+			top: 50%;
+			transform: translateY(-50%);
+			z-index: 200;
+			display: none;
+			cursor: pointer;
+		}
+
+		#updateNotification.visible {
+			display: block;
+			animation: updateSlideIn 0.5s ease-out;
+		}
+
+		@keyframes updateSlideIn {
+			from {
+				opacity: 0;
+				transform: translateY(-50%) translateX(50px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(-50%) translateX(0);
+			}
+		}
+
+		#updateNotification .update-badge {
+			background: rgba(40, 40, 40, 0.85);
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			border: 2px solid color-mix(in srgb, var(--hmi-primary) 50%, transparent);
+			border-radius: 16px;
+			padding: 16px 20px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 8px;
+			min-width: 140px;
+			box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+			transition: all 0.2s ease;
+		}
+
+		#updateNotification .update-badge:hover {
+			border-color: var(--hmi-primary);
+			box-shadow: 0 4px 25px color-mix(in srgb, var(--hmi-primary) 30%, transparent);
+			transform: scale(1.02);
+		}
+
+		#updateNotification .update-badge:active {
+			transform: scale(0.98);
+		}
+
+		#updateNotification .update-icon {
+			width: 48px;
+			height: 48px;
+			color: var(--hmi-primary);
+		}
+
+		#updateNotification .update-text {
+			font-size: calc(12px * var(--hmi-scale));
+			color: rgba(255, 255, 255, 0.8);
+			text-align: center;
+			display: flex;
+			flex-direction: column;
+		}
+
+		#updateNotification .update-version {
+			font-size: calc(14px * var(--hmi-scale));
+			font-weight: 500;
+			color: var(--hmi-primary);
+			font-family: monospace;
+		}
+
+		/* Pulse animation for update icon */
+		@keyframes updatePulse {
+			0%, 100% { transform: scale(1); }
+			50% { transform: scale(1.1); }
+		}
+
+		#updateNotification .update-icon {
+			animation: updatePulse 2s ease-in-out infinite;
+		}
+
+		/* Responsive */
+		@media (max-width: 600px) {
+			#updateNotification {
+				right: 10px;
+			}
+
+			#updateNotification .update-badge {
+				padding: 12px 14px;
+				min-width: 100px;
+				border-radius: 12px;
+			}
+
+			#updateNotification .update-icon {
+				width: 36px;
+				height: 36px;
+			}
+
+			#updateNotification .update-text {
+				font-size: calc(10px * var(--hmi-scale));
+			}
+
+			#updateNotification .update-version {
+				font-size: calc(12px * var(--hmi-scale));
+			}
+		}
+
+
+
+		#logoContainer > img {
+			display: block;
+			width: 100%;
+			height: auto;
+			/*width: 80%;
+			height: 80%;*/
+		}
+
+
+		.hidden {
+			visibility: hidden;
+		}
+
+		.transparent {
+			border: none !important;
+			background-color: transparent !important;
+		}
+
+
+		#slideInFrames {
+			position:absolute;
+			width: 100%;
+			height: 100%;
+		}
+
+		#slideInFrames iframe {
+			border: none;
+			height: 100%;
+			width: 100%;
+		}
+
+		#slideInFrames > div:not(.placeholder):first-child {
+			height: 40%;
+		}
+
+		#slideInFrames > div:not(.placeholder) {
+			height: 30%;
+			width: 100%;
+		}
+
+		.placeholder {
+
+			width: 70%;
+			height: 0%;
+			margin-left: 15%;
+			border-bottom: 0.5px solid white;
+			border-top: 0.5px solid white;
+			border-radius: 0.5px;
+
+		}
+
+
+		#slideInContainer {
+
+			display: table;
+			box-sizing: border-box;
+			border: 2px solid white;
+			background-color: #ACB1BF;
+			width: 33%;
+			height: 100%;
+			position: absolute;
+			top: 0px;
+			left: -33%;
+
+		}
+
+		.slideInContainerActive {
+
+			transform: translate(100%,0);
+			-webkit-transform: translate(100%,0);
+			-moz-transform: translate(100%,0);
+			-o-transform: translate(100%,0);
+			-ms-transform: translate(100%,0);
+
+		}
+
+		#slideInButtonWrapper {
+
+			position: absolute;
+			display: inline-block;
+			top: 50%;
+			left: 100%;
+			height: 92px;
+			width: 46px;
+
+		}
+
+
+		#slideInButton {
+
+			position: relative;
+			height: 92px;
+			width: 46px;
+			top: -50%;
+		}
+
+
+		.slideInButtonActive {
+
+			left: -100%;
+			top: -50%; !important;
+
+		}
+
+		.transition {
+
+			transition: transform  1s ease-in-out;
+			-webkit-transition: transform 1s ease-in-out;
+			-moz-transition: transform 1s ease-in-out;
+			-o-transition: transform 1s ease-in-out;
+			-ms-transition: transform 1s ease-in-out;
+
+		}
+
+
+		@media (orientation: portrait) {
+
+			#logoContainer {
+				width: 40%;
+				min-width: 150px;
+			}
+
+
+
+			#slideInContainer {
+				width: 100%;
+				height: 100%;
+				top: 100%;
+				left: 0%;
+			}
+
+			#slideInFrames {
+
+				margin-top: 10%;
+				width: 100%;
+				height: 90%;
+
+			}
+
+
+
+			.slideInContainerActive {
+				transform: translate(0, -100%);
+				-webkit-transform: translate(0, -100%);
+				-moz-transform: translate(0, -100%);
+				-o-transform: translate(0, -100%);
+				-ms-transform: translate(0, -100%);
+			}
+
+			.slideInButtonActive {
+
+				right: 0% !important;
+				left: 50% !important;
+
+			}
+
+
+			#slideInButton {
+
+				left: 150%;
+				top: -25%;
+
+			}
+
+			#slideInButtonWrapper {
+
+				position: absolute;
+				display: inline-block;
+				top: 0%;
+				left: 50%;
+				transform:          rotate(-90deg);
+				-ms-transform:      rotate(-90deg);
+				-moz-transform:     rotate(-90deg);
+				-webkit-transform:  rotate(-90deg);
+				-o-transform:       rotate(-90deg);
+
+
+			}
+
+
+			@media
+			only screen and (-webkit-min-device-pixel-ratio: 2),
+			only screen and (   min--moz-device-pixel-ratio: 2),
+			only screen and (     -o-min-device-pixel-ratio: 2/1),
+			only screen and (        min-device-pixel-ratio: 2) {
+
+
+				@media(max-device-width: 1px) {
+
+					#slideInButton, #slideInButtonWrapper {
+						width: 75px;
+						height: 150px;
+					}
+
+				}
+
+			}
+
+		}
+
+		html,body {
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+		}
+		#errorscreen, #loadingscreen {
+			font-family: 'Roboto', sans-serif;
+			height: 100%;
+			width: 100%;
+			left: 0;
+			overflow: hidden;
+			position: fixed;
+			top: 0;
+			z-index: 9999;
+		}
+
+		#errorscreen {
+			display: none;
+		}
+
+		#errormessage {
+			position: absolute;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+		}
+
+		#errorbox {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 20px;
+			padding: 32px 48px;
+			background: rgba(40, 40, 40, 0.85);
+			backdrop-filter: blur(12px);
+			-webkit-backdrop-filter: blur(12px);
+			border-radius: 16px;
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+			text-align: center;
+			min-width: 320px;
+			max-width: 90vw;
+		}
+
+		/* Error screen spinner */
+		.error-spinner {
+			width: 60px;
+			height: 60px;
+			border: 4px solid rgba(255, 255, 255, 0.1);
+			border-top-color: var(--hmi-primary, #c00a26);
+			border-radius: 50%;
+			animation: loadingSpin 1s linear infinite;
+		}
+
+		@media (max-width: 480px) {
+			.error-spinner {
+				width: 48px;
+				height: 48px;
+			}
+		}
+
+		#errorbox > div {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 8px;
+		}
+
+		#errorrow1 {
+			font-size: calc(18px * var(--hmi-scale));
+			font-weight: 500;
+			color: #ffffff;
+			display: block;
+		}
+
+		#errorrow2 {
+			font-size: calc(14px * var(--hmi-scale));
+			color: rgba(255, 255, 255, 0.7);
+			display: block;
+		}
+
+		#errormessage a:link,
+		#errormessage a:visited,
+		#errormessage a:active {
+			color: #c00a26;
+			text-decoration: none;
+			font-weight: 500;
+			padding: 8px 20px;
+			background: rgba(192, 10, 38, 0.15);
+			border: 1px solid rgba(192, 10, 38, 0.3);
+			border-radius: 20px;
+			transition: all 0.2s ease;
+			display: inline-block;
+			margin-top: 8px;
+		}
+
+		#errormessage a:hover {
+			color: #ffffff;
+			background: #c00a26;
+			border-color: #c00a26;
+		}
+
+		#erroroverlay {
+			background: rgba(0, 0, 0, 0.75);
+			height: 100%;
+			left: 0;
+			position: absolute;
+			top: 0;
+			width: 100%;
+		}
+
+		#loadingscreen {
+			background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+			cursor: wait;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		/* Loading Screen Box */
+		#loadingbox {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 24px;
+			padding: 40px 60px;
+			background: rgba(40, 40, 40, 0.85);
+			backdrop-filter: blur(12px);
+			-webkit-backdrop-filter: blur(12px);
+			border-radius: 20px;
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+			text-align: center;
+			min-width: 360px;
+			max-width: 90vw;
+		}
+
+		/* Heliotherm Logo in Loading */
+		#loadingbox .loading-logo {
+			width: 120px;
+			height: 120px;
+			margin-bottom: 8px;
+		}
+
+		/* Spinner Animation */
+		.loading-spinner {
+			width: 60px;
+			height: 60px;
+			border: 4px solid rgba(255, 255, 255, 0.1);
+			border-top-color: var(--hmi-primary, #c00a26);
+			border-radius: 50%;
+			animation: loadingSpin 1s linear infinite;
+		}
+
+		@keyframes loadingSpin {
+			to { transform: rotate(360deg); }
+		}
+
+		/* Loading Title */
+		#loadingbox .loading-title {
+			font-size: calc(20px * var(--hmi-scale));
+			font-weight: 500;
+			color: #ffffff;
+		}
+
+		/* Status Text */
+		#loadingbox .loading-status {
+			font-size: calc(14px * var(--hmi-scale));
+			color: rgba(255, 255, 255, 0.7);
+			min-height: 20px;
+		}
+
+		/* Progress Steps */
+		.loading-steps {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			width: 100%;
+			margin-top: 8px;
+		}
+
+		.loading-step {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			padding: 10px 16px;
+			background: rgba(255, 255, 255, 0.05);
+			border-radius: 10px;
+			transition: all 0.3s ease;
+		}
+
+		.loading-step.active {
+			background: rgba(192, 10, 38, 0.15);
+			border: 1px solid rgba(192, 10, 38, 0.3);
+		}
+
+		.loading-step.completed {
+			background: rgba(110, 164, 57, 0.15);
+			border: 1px solid rgba(110, 164, 57, 0.3);
+		}
+
+		.loading-step .step-icon {
+			width: 24px;
+			height: 24px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: rgba(255, 255, 255, 0.1);
+			flex-shrink: 0;
+		}
+
+		.loading-step.active .step-icon {
+			background: var(--hmi-primary, #c00a26);
+		}
+
+		.loading-step.completed .step-icon {
+			background: #6ea439;
+		}
+
+		.loading-step .step-icon svg {
+			width: 14px;
+			height: 14px;
+			color: #ffffff;
+		}
+
+		/* Mini spinner for active step */
+		.loading-step.active .step-icon {
+			animation: stepPulse 1.5s ease-in-out infinite;
+		}
+
+		@keyframes stepPulse {
+			0%, 100% { opacity: 1; transform: scale(1); }
+			50% { opacity: 0.7; transform: scale(0.95); }
+		}
+
+		.loading-step .step-text {
+			font-size: calc(13px * var(--hmi-scale));
+			color: rgba(255, 255, 255, 0.6);
+			text-align: left;
+		}
+
+		.loading-step.active .step-text {
+			color: #ffffff;
+			font-weight: 500;
+		}
+
+		.loading-step.completed .step-text {
+			color: rgba(255, 255, 255, 0.8);
+		}
+
+		/* Responsive */
+		@media (max-width: 480px) {
+			#loadingbox {
+				padding: 30px 24px;
+				min-width: 280px;
+			}
+
+			#loadingbox .loading-logo {
+				width: 80px;
+				height: 80px;
+			}
+
+			.loading-spinner {
+				width: 48px;
+				height: 48px;
+			}
+
+			#loadingbox .loading-title {
+				font-size: calc(18px * var(--hmi-scale));
+			}
+		}
+
+		#visuWrapper {
+			position: absolute;
+			top: 0; left: 0;
+			width: 100%; height: 100%;
+			box-sizing: border-box;
+			background-size: cover;
+			background-position: center center;
+			background-repeat: no-repeat;
+		}
+
+		.mainContainerDefaultStyle {
+			height: inherit;
+			width: inherit;
+			position: absolute;
+			overflow: hidden;
+			transform-origin: 0 0 0;
+			/*background-color: #292a37;*/
+		}
+
+		#backgroundDotsContainer {
+		  position: absolute;
+		  bottom: 25px;
+		  right: 30px;
+		  display: flex;
+		  gap: 8px;
+		  z-index: 100;
+		}
+
+		#backgroundDotsContainer input {
+		  display: none; /* versteckt die nativen Radio-Buttons */
+		}
+
+		#backgroundDotsContainer .dot {
+		  width: 16px;
+		  height: 16px;
+		  border: 2px solid white;
+		  border-radius: 50%;
+		  cursor: pointer;
+		  transition: background-color 0.2s;
+		}
+
+		/* gefüllte Variante, wenn das zugehörige input aktiv ist */
+		#backgroundDotsContainer input:checked + .dot {
+		  background-color: white;
+		}
+	</style>
+
+	<script src="webmicfg.js" type="text/javascript"></script>
+	<script src="/i18n/i18n-loader.js" type="text/javascript"></script>
+	<script type="text/javascript">/*<![CDATA[*/
+	var docDomain=true;
+	var displaytype="xhtml";
+	if ("webMIConfig" in window) {
+		var config = window["webMIConfig"];
+		if("frame.documentdomain" in config)
+			docDomain=config["frame.documentdomain"];
+		if("frame.displaytype" in config)
+			displaytype=config["frame.displaytype"];
+	}
+	if(displaytype != "xhtml" && displaytype != "svg") {
+		displaytype="xhtml"
+	}
+	if(docDomain == true) {
+		try {
+			if (displaytype == "svg" && navigator.userAgent.indexOf("Firefox") > -1)
+				throw false;
+
+			var domain = location["hostname"]
+					.split(".")
+					.slice(-2);
+
+			document.domain = domain.join(".");
+		} catch (e) {}
+	}
+
+	/*]]>*/</script>
+	<script src="project.js" type="text/javascript"></script>
+	<script src="config.js" type="text/javascript"></script>
+	<script src="webmi.js" type="text/javascript"></script>
+
+	<!-- Modern HMI Infrastructure -->
+	<script src="/js/webmi-context.js" type="text/javascript"></script>
+	<script src="/js/svg-loader.js" type="text/javascript"></script>
+	<script src="/js/hmi-helpers.js" type="text/javascript"></script>
+	<script src="/js/login-controller.js" type="text/javascript"></script>
+
+	<script type="text/javascript">/*<![CDATA[*/
+
+	//  handles screen layout on resize
+	function layoutHandler() {
+
+		var screenLayout = getScreenLayout();
+
+		// Guard against resize events before DOM is ready
+		if (!mainframe || !visuWrapper) return;
+
+		if (isMobileTouchDevice) {
+
+			mainframe.style.width = visuWrapper.style.width = "100%";
+			mainframe.style.height = visuWrapper.style.height = "100%";
+
+		}
+
+		if (screenLayout.changed) {
+
+			currentLayout = screenLayout.layout;
+			changeDisplayLayout(screenLayout.layout);
+		}
+	}
+
+
+
+	// returns correct transition type for elements
+	function whichTransitionEvent(ele) {
+
+		var currTransition = "";
+
+		var transitions = {
+			"transition"      : "transitionend",
+			"OTransition"     : "oTransitionEnd",
+			"MozTransition"   : "transitionend",
+			"WebkitTransition": "webkitTransitionEnd"
+		}
+
+		for (currTransition in transitions){
+			if (ele.style[currTransition] !== undefined){
+				return transitions[currTransition];
+			}
+		}
+	}
+
+
+
+	// changes screen layout
+	function changeDisplayLayout(layout) {
+
+		var loadDisplay;
+		var currentDisplayItem;
+		var currentDisplayIdentifier;
+		var currentDisplayArray = [];
+		var newLayoutPrefix = layout;
+		var currentLayoutPrefix;
+		var newDefaultDisplay;
+		var contentFrame = document.getElementById("content_myframe");
+		var displayItem = {};
+		var categoryRootDisplayLevel = 4;
+
+		if (layout == "Portrait") {
+
+			currentLayoutPrefix = "Landscape";
+			newDefaultDisplay = getDisplay(config.portraitDisplayIdentifier);
+
+		} else {
+
+			currentLayoutPrefix = "Portrait";
+			newDefaultDisplay = getDisplay(config.landscapeDisplayIdentifier);
+
+		}
+
+		if (!contentFrame) {
+			return;
+		}
+
+		currentDisplayItem = inverseDisplayDictionary[getDisplayFromSrc(contentFrame.src)];
+
+
+		currentDisplayIdentifier = currentDisplayItem.identifier
+				.replace(currentLayoutPrefix, newLayoutPrefix);
+
+		loadDisplay = getDisplay(currentDisplayIdentifier);
+
+		if (loadDisplay == "") {
+
+			// use main display for specific category if current display
+			// is not available in new layout
+			currentDisplayArray = currentDisplayIdentifier.split(".");
+			currentDisplayIdentifier = currentDisplayArray.slice(0, categoryRootDisplayLevel).join(".") +
+					"." + config.rootDisplayName;
+
+			loadDisplay = getDisplay(currentDisplayIdentifier);
+
+
+			// if category display is also not available, then use main display
+			if (loadDisplay != "") {
+
+				loadDisplay = getDisplay(config.rootDisplayIdentifier);
+
+			}
+
+		}
+
+		handler("resetFirstConnect");
+		// Check if mainframe exists (may be commented out for HTML-only mode)
+		if (mainframe) {
+			mainframe.src = webMI.display.createURL(newDefaultDisplay, {loadDisplay: loadDisplay});
+		}
+	}
+
+	// returns current content frame display
+	function getDisplayFromSrc(contentFrameSrc) {
+
+		if (!contentFrameSrc) {
+			return "";
+		}
+
+		// Extract display name from URL, removing path prefix (e.g., "templates/")
+		var fullPath = contentFrameSrc.slice(contentFrameSrc.indexOf("/svg/") + 5, contentFrameSrc.indexOf(".svg"));
+		// Remove "templates/" prefix if present
+		if (fullPath.indexOf("templates/") === 0) {
+			return fullPath.slice(10); // "templates/".length = 10
+		}
+		return fullPath;
+	}
+
+	// returns  screen layout
+	function getScreenLayout() {
+
+		var layout = (window.matchMedia("(orientation: landscape)").matches) ? "Landscape" : "Portrait";
+		return {layout: layout, changed: layout != currentLayout};
+	}
+
+	// browses displaysJs and creates display dictionaries
+	function createDisplayDictionaries (displayArray) {
+
+		browseDisplays(displayArray,1, config.rootDisplayDirectory);
+
+	}
+
+	// browses displaysJs and creates display dictionaries
+	function browseDisplays (displayArray, level, displayDirectory) {
+
+		for (var i = 0; i < displayArray.length; i++) {
+
+			if (displayArray[i].hasOwnProperty("sub")) {
+				browseDisplays(displayArray[i].sub, level+1, displayArray[i].identifier);
+				continue;
+			}
+
+			addDisplayToDictionaries(displayArray[i], level, displayDirectory);
+		}
+	}
+
+	// adds display items to dictionaries
+	function addDisplayToDictionaries (displayItem, level, displayDirectory) {
+
+		displayDictionary [displayItem.identifier] = {
+			"display": displayItem.display,
+			"level": level,
+			"displayDirectory": displayDirectory,
+			"name": displayItem.name
+		};
+
+		inverseDisplayDictionary [displayItem.display] = {
+			"identifier": displayItem.identifier,
+			"level": level,
+			"displayDirectory": displayDirectory,
+			"name": displayItem.name
+		};
+	}
+
+	// returns display identifier for given display
+	function getDisplayIdentifier (display) {
+
+		if (!inverseDisplayDictionary.hasOwnProperty(display)) {
+
+			return "";
+
+		}
+
+		return inverseDisplayDictionary[display].identifier;
+	}
+
+	// returns display for given display identifier
+	function getDisplay (displayIdentifier) {
+
+		if (!displayDictionary.hasOwnProperty(displayIdentifier)) {
+
+			return "";
+
+		}
+
+		return displayDictionary[displayIdentifier].display;
+	}
+
+	// returns display item for given display
+	function getDisplayItem (display) {
+
+		if (!inverseDisplayDictionary.hasOwnProperty(display)) {
+
+			return "";
+
+		}
+
+		return inverseDisplayDictionary[display];
+	}
+
+	// returns display item for given display identifier
+	function getInverseDisplayItem (displayIdentifier) {
+
+		if (!displayDictionary.hasOwnProperty(displayIdentifier)) {
+
+			return "";
+
+		}
+
+		return displayDictionary[displayIdentifier];
+	}
+
+	// returns root display identifier
+	function getRootDisplayIdentifier () {
+
+		return config.rootDisplayIdentifier;
+	}
+
+	// returns main display name
+	function getMainDisplayName () {
+
+		return config.rootDisplayName;
+	}
+
+	// returns main display name
+	function getLanguageNodeIdentifier () {
+
+		return config.languageNodeIdentifier;
+
+	}
+
+	// returns language dictionary
+	function getLanguageDictionary () {
+
+		return config.languages;
+	}
+
+	// returns error log node
+	function getErrorLogNodeIdentifier () {
+
+		return config.errorLogNodeIdentifier;
+	}
+
+	// returns web status node
+	function getWebStatusNodeIdentifier () {
+
+		return config.webStatusNodeIdentifier;
+	}
+
+
+
+
+	// updates weather data
+/*
+	function updateWeatherData (latitude, longitude) {
+
+		latitude = parseFloat(latitude, 10);
+		longitude = parseFloat(longitude, 10);
+
+		var xmlHttp = null;
+
+		if (typeof longitude != "number") {
+
+			console.warn("T{Longitude node is not a number type. Please check your node configuration}");
+
+		} else if (typeof latitude != "number") {
+
+			console.warn("T{Longitude node is not a number type. Please check your node configuration}");
+
+		} else if (longitude < - 90 || longitude > 90) {
+
+			console.warn("T{Longitude value is out of range. Please check your node configuration}");
+
+		} else if (latitude < - 180 || latitude > 180) {
+
+			console.warn("T{Latitude value is out of range. Please check your node configuration}");
+
+		} else {
+
+			sendWeatherAPIRequest(latitude, longitude);
+
+		}
+
+	}
+
+
+	// sends the xmlHttp request object
+
+	function sendWeatherAPIRequest (latitude, longitude) {
+
+		var xmlHttp = new XMLHttpRequest();
+
+		var requestURL = webMI.sprintf("%s?lat=%s&lon=%s&apikey=%s",
+				config.meteoblueApiUrl, latitude, longitude, config.meteoblueApiKey);
+
+		//xmlHttp.setRequestHeader("GET-Weather-API-DATA", "");
+		xmlHttp.open("GET",requestURL, true);
+
+		xmlHttp.onload = function() {
+
+			var weatherData = null;
+
+			// check if request was successful
+			if (xmlHttp.status >= 200 && xmlHttp.status < 300) {
+
+				try {
+
+					weatherData = JSON.parse(xmlHttp.responseText);
+
+				}
+				catch(e) {
+
+					console.warn("T{Weather API response is broken. Please contact support}");
+				}
+
+			} else {
+
+				console.warn(xmlHttp.statusText, xmlHttp.responseText);
+			}
+
+			distributeWeatherData(weatherData);
+		}
+
+		xmlHttp.send();
+	}
+
+	function distributeWeatherData (weatherData) {
+
+		var triggerObj = {
+			noData: false
+		};
+
+		var pictoCodes = [];
+		var meanTemperatures = [];
+
+		var key = ""
+		var index = 0;
+
+		var displayMapping = config.weatherDisplayMapping;
+
+		function checkProperty (property) {
+
+			if (typeof property == "undefined") {
+
+				if (!triggerObject.noData) {
+
+					triggerObj.noData = true
+
+				}
+
+				return null;
+
+			} else {
+
+				return property;
+
+			}
+		}
+
+		if (weatherData == null) {
+
+			triggerObj.noData = true;
+
+		} else {
+
+			pictoCodes = weatherData.data_day.pictocode;
+			meanTemperatures = weatherData.data_day.temperature_mean;
+
+			for (key in displayMapping) {
+
+				key = Number(key);
+				triggerObj[displayMapping[key]] = {};
+
+				triggerObj[displayMapping[key]].pictoCode = checkProperty(pictoCodes[key]);
+				triggerObj[displayMapping[key]].meanTemperature = checkProperty(meanTemperatures[key]);
+
+			}
+		}
+
+		webMI.trigger.fire("com.atvise.weatherDataUpdate", triggerObj);
+
+	}
+*/
+
+	function isTouchDevice () {
+		return isMobileTouchDevice;
+	}
+
+
+	var autofit = webMI.query.autofit;
+	var scaleType = webMI.getConfig("frame.scaletype");
+	var defaultdisplay = webMI.query.defaultdisplay;
+	var defaulturl = webMI.query.defaulturl;
+	var language = webMI.query.language || "en";
+	var isRootDisplay = webMI.display.isRoot();
+	var isMobileTouchDevice = /Mobile|iP(hone|od|ad)|Android|BlackBerry|IEMobile|Kindle|NetFront|Silk-Accelerated|(hpw|web)OS|Fennec|Minimo|Opera M(obi|ini)|Blazer|Dolfin|Dolphin|Skyfire|Zune/.test(navigator.userAgent); // https://gist.github.com/dalethedeveloper/1503252
+	var iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+	var currentLayout = "";
+	var mainframe = null;
+	var visuWrapper = null;
+	var firstLoad = true;
+
+	//var slideInButtonSrc = "/img/slideInButton.svg";
+	//var slideInButtonActiveSrc = "/img/slideInButtonActive.svg";
+
+	// display dictionary object
+	var displayDictionary = {};
+	var inverseDisplayDictionary = {};
+
+	// location information of heat pump
+	var longitude = null;
+	var latitude = null;
+
+
+
+	if (typeof autofit === "undefined")
+		autofit = !isMobileTouchDevice;
+	else
+		autofit = autofit != "false" && autofit != "0";
+
+	if (isMobileTouchDevice)
+		autofit = true;
+
+
+	if (isRootDisplay) {
+		var bestIndexExtension = "";
+		for (var i in project.extensions) {
+			var arr = project.extensions[i];
+			webMI.setExtension(i, arr[0], arr[1]);
+
+			if (bestIndexExtension != "index" && /(^|\.)index$/.test(i))
+				bestIndexExtension = i;
+		}
+
+		if (bestIndexExtension != "") {
+			var arr = project.extensions[bestIndexExtension];
+			webMI.setExtension("index", arr[0], arr[1]);
+		}
+
+		webMI.setConfig("frame.enableautofit", autofit);
+	}
+
+	function nodeNameIs(node, value) {
+		if (!node)
+			return false;
+
+		return String(node.nodeName).toLowerCase() == value;
+	}
+
+	function ForeignObject(frameHandler, element) {
+		this.frameHandler_ = frameHandler;
+		this.element_ = element;
+	}
+
+	ForeignObject.prototype.isResponsible = function(element) {
+		return this.element_ == element;
+	}
+
+	ForeignObject.prototype.setAttributes = function() {
+		this.element_.style.left = this.left_ + "px";
+		this.element_.style.top = this.top_ + "px";
+		this.element_.style.width = this.width_ + "px";
+		this.element_.style.height = this.height_ + "px";
+		if(scaleType == "native")
+			this.element_.style.fontSize = this.fontFactor_ + "em";
+	}
+
+	ForeignObject.prototype.setPosition = function(element, left, top, width, height, fontFactor) {
+		if (!this.isResponsible(element))
+			return;
+
+		this.left_ = Math.round(left*10)/10;
+		this.top_ = Math.round(top*10)/10;
+		this.width_ = Math.round(width*10)/10;
+		this.height_ = Math.round(height*10)/10;
+		this.fontFactor_ = fontFactor;
+
+		var parentFrameHandler = this.frameHandler_.parentFrameHandler_;
+		if (parentFrameHandler)
+			this.fontFactor_ /= parentFrameHandler.fontFactor_;
+
+		this.setAttributes();
+	}
+
+	function FrameHandler(element, foreignObjectContainer, parentFrameHandler, parentForeignObject) {
+		var self = this;
+		this.element_ = element;
+		this.foreignObjectContainer_ = foreignObjectContainer;
+		this.parentFrameHandler_ = parentFrameHandler;
+		this.foreignObjects_ = [];
+		this.fontFactor_ = 1;
+		this.subFrames_ = [];
+		this.parentForeignObject_ = parentForeignObject;
+
+		webMI.display.setForeignObjectHandler(element, { create: function(childElements) {
+			var ret = document.createElement("div");
+			ret.style.position = "absolute";
+			ret.style.overflow = "hidden";
+
+			self.foreignObjects_.push(new ForeignObject(self, ret));
+			for (var i = 0; i < childElements.length; ++i)
+				ret.appendChild(childElements[i]);
+
+			return ret;
+		}, destroy: function(element) {
+			for (var i = 0; i < self.foreignObjects_.length; ++i) {
+				if (self.foreignObjects_[i].isResponsible(element)) {
+					self.foreignObjects_.splice(i, 1);
+					break;
+				}
+			}
+
+			for (var i = 0; i < self.subFrames_.length; ++i) {
+				var subFrame = self.subFrames_[i];
+				if (subFrame.parentForeignObject_ == element) {
+					$FrameHandler(subFrame);
+					self.subFrames_.splice(i--, 1);
+				}
+			}
+		}, set: function(element, left, top, width, height, fontFactor) {
+
+			self.fontFactor_ = fontFactor;
+
+			for (var i = 0; i < self.foreignObjects_.length; ++i) {
+
+				self.foreignObjects_[i].setPosition(element, left, top, width, height, fontFactor);
+			}
+
+		}, add: function(element) {
+			self.foreignObjectContainer_.appendChild(element);
+			handler("addedforeignobject", element);
+		}, remove: function(element) {
+			if (element.parentNode == self.foreignObjectContainer_) {
+				self.foreignObjectContainer_.removeChild(element);
+				handler("removedforeignobject", element);
+			}
+		}, register: function(element, childElements) {
+			for (var i = 0; i < childElements.length; ++i) {
+				var child = childElements[i];
+				if (nodeNameIs(child, "iframe")) {
+					var container = element.ownerDocument.createElement("div");
+					container.style.position = "absolute";
+					element.insertBefore(container, child);
+					self.subFrames_.push(new FrameHandler(child, container, self, element));
+				}
+			}
+		}, applyOffsetsToMatrix: function(matrix) {
+			matrix.e += self.offsetLeft(true);
+			matrix.f += self.offsetTop(true);
+			return matrix;
+		}});
+
+		webMI.display.setOpenWindowHandler(element, function(value) {
+			var scaleFactor = self.element_.contentWindow.webMI.gfx.getAbsoluteScaleFactor();
+			var ret = handler("openwindow", value, self.offsetLeft(), self.offsetTop(), self.element_.clientWidth*scaleFactor, self.element_.clientHeight*scaleFactor);
+			var foreignObjectContainer = self.foreignObjectContainer_;
+			if ("getForeignObjectContainer" in ret)
+				foreignObjectContainer = ret.getForeignObjectContainer();
+			if ("getFrame" in ret)
+				self.subFrames_.push(new FrameHandler(ret.getFrame(), foreignObjectContainer, self));
+			return ret;
+		});
+
+		webMI.display.setShowPopupHandler(element, function(x, y, value) {
+			return handler("showpopup", x + self.offsetLeft(), y + self.offsetTop(), value);
+		});
+
+	}
+
+	function $FrameHandler(self) {
+		if (webMI) {
+			webMI.display.setForeignObjectHandler(self.element_, null);
+			webMI.display.setOpenWindowHandler(self.element_, null);
+			webMI.display.setShowPopupHandler(self.element_, null);
+		}
+	}
+
+	FrameHandler.prototype.setSize = function(width, height) {
+		this.width_ = width;
+		this.height_ = height;
+
+		this.element_.style.width = width + "px";
+		this.element_.style.height = height + "px";
+	}
+
+
+	FrameHandler.prototype.offsetLeft = function(untilBody) {
+		return webMI.gfx.getAbsoluteOffset("left", untilBody, this.element_);
+	}
+
+	FrameHandler.prototype.offsetTop = function(untilBody) {
+		return webMI.gfx.getAbsoluteOffset("top", untilBody, this.element_);
+	}
+
+	var displaysJs;
+	var mainFrameHandler;
+	var remainingLoadEvents = 2;
+	var loadEventLanguage = null;
+	var handler = webMI.callExtension("index");
+
+	function loadEvent(lng, currentDisplay) {
+
+		var slideInFrame1 = document.getElementById("slideInFrame1");
+		var slideInFrame2 = document.getElementById("slideInFrame2");
+		var slideInFrame3 = document.getElementById("slideInFrame3");
+		var foreignobjects = document.getElementById("foreignobjects");
+		var absolutePrefix = location.pathname.substr(0, location.pathname.lastIndexOf("/") + 1);
+		//var mainframeURL, slideInFrame1URL, slideInFrame2URL, slideInFrame3URL;
+
+		if (!mainFrameHandler && mainframe) {
+			mainFrameHandler = new FrameHandler(mainframe, foreignobjects);
+		}
+		if (!loadEventLanguage) {
+			loadEventLanguage = lng;
+
+		}
+		if (--remainingLoadEvents > 0) {
+			return;
+
+		}
+		webMI.display.setURLPrefix(absolutePrefix + displaysJs["prefix"]);
+		webMI.display.setURLPostfix(displaysJs["postfix"]);
+
+		if (!this.isRootDisplay){
+			var url = defaulturl;
+			if(webMI.isExternalHost(url, location) && isMobileTouchDevice){
+				var mainContainer = document.getElementById("mainContainer");
+				mainContainer.classList.remove("mainContainerDefaultStyle");
+			}
+		}
+
+		currentLayout = getScreenLayout().layout;
+
+		var defaultDisplay = getDisplay(currentLayout == "Landscape" ? config.landscapeDisplayIdentifier : config.portraitDisplayIdentifier);
+
+		if (defaultDisplay) {
+
+			mainframeURL = webMI.display.createURL(defaultDisplay, {loadDisplay: currentDisplay ? currentDisplay : getDisplay(config.rootDisplayIdentifier)});
+			//slideInFrame1URL = webMI.display.createURL(getDisplay(config.slideInFrame1DisplayIdentifier), webMI.query);
+			//slideInFrame2URL = webMI.display.createURL(getDisplay(config.slideInFrame2DisplayIdentifier), webMI.query);
+			//slideInFrame3URL = webMI.display.createURL(getDisplay(config.slideInFrame3DisplayIdentifier), webMI.query);
+
+			handler("loaded");
+
+			// Check if mainframe exists (may be commented out for HTML-only mode)
+			if (mainframe) {
+				mainframe.src = mainframeURL;
+			} else {
+				// HTML-only mode: navigate to default HTML page only if no hash is set
+				var currentHash = window.location.hash.replace('#', '');
+				if (currentHash && typeof window.navigateToHTMLPage === 'function') {
+					// Hash already set (e.g., from bookmark or direct link) - navigate to that page
+					console.log('[HMI] No iframe, hash already set to:', currentHash);
+					window.navigateToHTMLPage(currentHash);
+				} else if (typeof window.navigateToHTMLPage === 'function') {
+					// No hash set - load default page
+					console.log('[HMI] No iframe, loading default HTML page');
+					window.navigateToHTMLPage('default');
+				}
+			}
+			//slideInFrame1.src = slideInFrame1URL;
+			//slideInFrame2.src = slideInFrame2URL;
+			//slideInFrame3.src = slideInFrame3URL;
+
+		}
+	}
+
+	var currentHostName = "";
+	webMI.addEvent(webMI.data, 'serverstatechange', function(e) {
+		currentHostName = location.protocol + "//" + e.active.currentHostName + "/";
+	});
+
+	function switchLanguage(lng) {
+
+		var currentDisplay = "";
+		var contentFrame = document.getElementById("content_myframe");
+
+		if (contentFrame) {
+			currentDisplay = getDisplayFromSrc(contentFrame.src);
+		}
+
+
+		language = lng;
+
+		if (!(language in project.languages)) {
+			if (typeof language === "string")
+				console.error("Invalid language '" + lng + "'");
+			language = navigator.language ? navigator.language : navigator.browserLanguage;
+			if (!(language in project.languages)) {
+				var pos = language.indexOf("-");
+				if (pos > 0)
+					language = language.substr(0, pos);
+				if (!(language in project.languages)) {
+					for (var i in project.languages) {
+						language = i;
+						break;
+					}
+				}
+			}
+		}
+
+		handler("switchedlanguage", language);
+
+		// Initialize i18n loader with the new language
+		if (typeof i18nLoader !== 'undefined') {
+			i18nLoader.setLanguage(language).catch(function(err) {
+				console.warn('i18n: Failed to load language ' + language, err);
+			});
+		}
+
+		var xmlHttp = function() {
+			if (!/MSIE/.test(navigator.userAgent))
+				return new XMLHttpRequest();
+
+			// Don't use the XMLHttpRequest object for IE since the
+			// overwritten object by webMI.js won't work in window.open()
+
+			var xhrs = ["Msxml2.XMLHTTP.6.0", "Msxml2.XMLHTTP.3.0", "Msxml2.XMLHTTP", "Microsoft.XMLHTTP"];
+
+			for (var i = 0; i < xhrs.length; ++i) {
+				try {
+					return new ActiveXObject(xhrs[i]);
+				} catch (e) {
+				}
+			}
+
+			throw "This browser does not support XMLHttpRequest.";
+		}();
+
+		// SVG templates have been removed - use empty displays.js fallback
+		// This prevents 404 errors for /svg/displays.js
+		displaysJs = { menu: [] };
+		createDisplayDictionaries(displaysJs.menu);
+		handler("loadeddisplaysjs", displaysJs);
+		loadEvent(language, currentDisplay);
+	}
+
+	webMI.addEvent(webMI.data, "statechange", function(state) {
+		document.getElementById("errorscreen").style.display = state < 0 ? "block" : "none";
+	});
+
+	// Global function to show the reboot/reconnect screen
+	// Call this when a reboot or update is initiated
+	window.showRebootScreen = function(message, subMessage) {
+		var errorscreen = document.getElementById("errorscreen");
+		var errorrow1 = document.getElementById("errorrow1");
+		var errorrow2 = document.getElementById("errorrow2");
+
+		if (errorrow1 && message) {
+			errorrow1.textContent = message;
+		}
+		if (errorrow2 && subMessage) {
+			errorrow2.textContent = subMessage;
+		}
+
+		if (errorscreen) {
+			errorscreen.style.display = "block";
+		}
+	};
+
+	// Global update status monitor - shows reboot screen when update finishes (status 5)
+	// This catches auto-updates even when user is not on the update page
+	webMI.data.subscribe('./settings/update/status', function(e) {
+		var status = parseInt(e.value);
+		if (status === 5) {
+			// Update finished - system will reboot
+			window.showRebootScreen('System wird neu gestartet...', 'bitte warten...');
+		}
+	});
+
+	webMI.addOnresize(function(width, height) {
+		if (mainFrameHandler && !isMobileTouchDevice) {
+			//mainFrameHandler.setSize(width, height);
+		}
+		layoutHandler();
+	});
+
+	webMI.addOnload(function() {
+
+		var slideInContainer = document.getElementById("slideInContainer");
+		var slideInButton = document.getElementById("slideInButton");
+		var slideInFrames = document.getElementById("slideInFrames");
+		var slideInContainerTransitionType = whichTransitionEvent(slideInContainer);
+
+		mainframe = document.getElementById("mainframe");
+		visuWrapper = document.getElementById("visuWrapper");
+
+		//webMI.addEvent(slideInButton,["click"], function() {
+
+/*
+		if (!slideInContainer.classList.contains("slideInContainerActive")) {
+
+				slideInContainer.classList.remove("transparent");
+				slideInFrames.classList.remove("hidden");
+				slideInContainer.classList.add("transition");
+				slideInContainer.classList.add("slideInContainerActive");
+				slideInButton.classList.add("slideInButtonActive");
+				slideInButton.src = slideInButtonActiveSrc;
+
+			} else {
+
+				slideInContainer.classList.remove("slideInContainerActive");
+				slideInButton.classList.remove("slideInButtonActive");
+				slideInButton.src = slideInButtonSrc;
+
+			}
+
+		});
+
+//webmi.data.read testsimon
+
+		webMI.addEvent(slideInContainer, slideInContainerTransitionType, function() {
+
+			if (!slideInContainer.classList.contains("slideInContainerActive")) {
+
+				slideInFrames.classList.add("hidden");
+				slideInContainer.classList.add("transparent");
+				slideInContainer.classList.remove("transition");
+
+			}
+
+		});
+*/
+
+		if (!this.isRootDisplay) {
+			webMI.trigger.fire("com.atvise.subWindowLoaded", this);
+		}
+
+		if(autofit){
+			// `clip` statt `hidden`: verhindert programmatisches
+			// Scrollen, das sonst durch legacy #slideInFrames Overflow
+			// getriggert wird und einen 6-px-Streifen am unteren
+			// Bildschirmrand sichtbar macht.
+			document.body.style.overflow = "clip";
+		}
+
+		// Only add mainframe load handler if mainframe exists (not in HTML-only mode)
+		if (mainframe) {
+			webMI.addEvent(mainframe, "load", function() {
+
+				var longLatNodes = [
+					config.latitudeNodeIdentifier ?  config.latitudeNodeIdentifier : "",
+					config.longitudeNodeIdentifier ? config.longitudeNodeIdentifier : ""
+				];
+
+
+				// retrieve location of heat pump
+			/*
+				webMI.data.read(longLatNodes, function (e) {
+
+					var latitude = e[0].value;
+					var longitude = e[1].value;
+					var refreshInterval = config.weatherDataRefreshInterval ?
+					config.weatherDataRefreshInterval * 60 * 1000 : 600000;
+
+					// fetch weather data instantly and set interval for continuous updates
+					updateWeatherData(latitude, longitude);
+					setInterval(function () {
+						updateWeatherData(latitude, longitude);
+					}, refreshInterval);
+				});
+	*/
+				try {
+					if(displaytype == "xhtml"){
+						mainframe.contentDocument.body.style["overflow"] = "hidden";
+					}
+					var rootSvg = mainframe.contentDocument.documentElement;
+					if(displaytype=="xhtml"){
+
+						rootSvg = rootSvg.getElementsByTagName("svg")[0];
+					}
+					var rootSvgViewBox = mainframe.contentWindow.webMI.display.getInitialViewBox();
+
+					var viewportwidth = rootSvgViewBox[2];
+					rootSvg.style.height = "100%";
+					rootSvg.style.width = "100%";
+
+					if (isMobileTouchDevice) {
+						if (!autofit && isRootDisplay){
+							var viewportMeta = document.getElementById('viewport-meta');
+							viewportMeta.setAttribute("content", "width=" + viewportwidth + ", user-scalable=yes");
+						}
+					}
+				} catch(ex){}
+
+				// Apply i18n translations to mainframe and setup automatic translation
+				if (typeof i18nLoader !== 'undefined' && mainframe.contentDocument) {
+					try {
+						// Setup automatic translation for this document
+						// This translates immediately and sets up MutationObserver for dynamic content
+						i18nLoader.setupDocument(mainframe.contentDocument);
+
+						// Also translate any nested iframes
+						i18nLoader.translateAllFrames(mainframe.contentDocument);
+					} catch(i18nEx) {
+						console.warn('i18n: Failed to setup translation:', i18nEx);
+					}
+				}
+
+				// Note: Loading screen is now controlled by initProgress subscription
+				// document.getElementById("loadingscreen").style.display = "none";
+				handler("loadedmainframe", mainframe);
+			});
+		}
+
+		webMI.data.subscribe(config.languageNodeIdentifier, function(e) {
+
+			var newLanguage;
+
+			if (config.languages.hasOwnProperty(e.value)) {
+				newLanguage = config.languages[e.value];
+			} else {
+				newLanguage = language;
+			}
+
+			if (firstLoad) {
+
+				language = newLanguage;
+				firstLoad = false;
+				loadEvent();
+				switchLanguage(newLanguage);
+
+			}	else if (newLanguage != language) {
+				switchLanguage(newLanguage);
+			}
+
+		});
+	});
+
+
+
+var initRefreshTimer = null;
+var loadedWithFalse = false;
+
+webMI.data.subscribe(["./mcg/data/web/initOk"], function(e){
+	var reload = e.value;
+
+	if ( reload === false) {
+		loadedWithFalse = true;
+	}else{
+		// Sofort nach Updates suchen wenn WebUI geöffnet wird
+		webMI.data.write('./settings/update/search', 1);
+
+		if(loadedWithFalse === true){
+			var button = document.querySelector('#errorscreen a');
+			button.click();
+		}else{
+
+
+		}
+	}
+});
+
+	/*]]>*/</script>
+
+</head>
+<body>
+<!-- Global Navigation Bar (Desktop) -->
+<hmi-navbar id="main-navbar"></hmi-navbar>
+
+<!-- Hamburger Menu (Mobile) -->
+<hmi-hamburger-menu id="mobile-menu"></hmi-hamburger-menu>
+
+<div id="visuWrapper">
+	<div id="mainContainer" class="mainContainerDefaultStyle">
+		<!-- Legacy iframe (hidden - kept for reference, may be removed later)
+		<iframe style="position:absolute;top:0;left:0;width:100%;height:100%" id="mainframe" srcolling="no" src="about:blank" frameborder="0"></iframe>
+		-->
+
+		<!-- Modern HTML Page Container (for migrated pages) -->
+		<div id="html-page-container"></div>
+
+		<div id="foreignobjects" style="position:absolute;top:0;left:0"></div>
+		<div id="extensions" style="position:absolute;top:0;left:0"></div>
+		<div id="loadingscreen">
+			<div id="loadingbox">
+				<img src="" alt="" class="loading-logo" style="opacity: 0;" />
+				<div class="loading-spinner"></div>
+				<div class="loading-title" data-i18n="boot_connecting">Verbindung wird hergestellt...</div>
+				<div class="loading-status" id="loading-status-text" data-i18n="boot_initializing">Initialisierung...</div>
+				<div class="loading-steps">
+					<div class="loading-step" id="step-connect">
+						<div class="step-icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M5 12h14M12 5l7 7-7 7"/>
+							</svg>
+						</div>
+						<span class="step-text" data-i18n="boot_step_connect">Verbindung zum WebRegler</span>
+					</div>
+					<div class="loading-step" id="step-mp">
+						<div class="step-icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M3 3v18h18"/>
+								<path d="M7 16l4-4 4 4 5-6"/>
+							</svg>
+						</div>
+						<span class="step-text" data-i18n="boot_step_mp">Messpunkte laden</span>
+					</div>
+					<div class="loading-step" id="step-sp">
+						<div class="step-icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<circle cx="12" cy="12" r="3"/>
+								<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+							</svg>
+						</div>
+						<span class="step-text" data-i18n="boot_step_sp">Einstellungen laden</span>
+					</div>
+					<div class="loading-step" id="step-tp">
+						<div class="step-icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<circle cx="12" cy="12" r="10"/>
+								<path d="M12 6v6l4 2"/>
+							</svg>
+						</div>
+						<span class="step-text" data-i18n="boot_step_tp">Zeitprogramme laden</span>
+					</div>
+					<div class="loading-step" id="step-done">
+						<div class="step-icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M20 6L9 17l-5-5"/>
+							</svg>
+						</div>
+						<span class="step-text" data-i18n="boot_step_done">Initialisierung abschliessen</span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="errorscreen"><div id="erroroverlay">&nbsp;</div><div id="errormessage"><div id="errorbox"><div class="error-spinner"></div><div><span id="errorrow1">Verbindung wird hergestellt...</span><span id="errorrow2">bitte warten...</span></div><div><a href="#" onclick="window.location.reload()">Neu laden</a></div></div></div></div>
+	</div>
+
+<!-- Edelweiß Logo Container - top left -->
+<div id="edelweissContainer" class="global-circle-container">
+	<div class="circle-content">
+		<img src="/img/edelweis.svg" alt="Heliotherm" class="edelweiss-icon" />
+	</div>
+</div>
+
+<!-- Clock Container - bottom left -->
+<div id="globalClockContainer" class="global-circle-container">
+	<div class="circle-content clock-content">
+		<span class="date" id="global-clock-date">--</span>
+		<span class="time" id="global-clock-time">--:--</span>
+	</div>
+</div>
+
+<!-- Status Indicator - top center (Fehler/Status circle) -->
+<div id="statusIndicatorContainer">
+	<img id="heatingRodIndicator" src="img/icons/IconColorSmallHeatingRod.png" alt="Heizstab" class="heating-rod-icon" style="display:none;">
+	<div id="statusIndicator" class="status-circle"></div>
+	<span id="statusTooltip" class="status-tooltip">Bereit</span>
+</div>
+
+<!-- Background selector dots -->
+<div id="backgroundDotsContainer">
+  <input type="radio" name="bg" id="bg1" value="1">
+  <label for="bg1" class="dot"></label>
+  <input type="radio" name="bg" id="bg2" value="2">
+  <label for="bg2" class="dot"></label>
+  <input type="radio" name="bg" id="bg3" value="3">
+  <label for="bg3" class="dot"></label>
+</div>
+
+	<div id="logoContainer">
+		<img id="logo" src="/img/logo.png">
+	</div>
+
+	<!-- Update Notification - right side middle -->
+	<div id="updateNotification">
+		<div class="update-badge">
+			<svg class="update-icon" viewBox="0 0 24 24">
+				<path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.5-9.12 0-12.6 3.51-3.47 9.14-3.47 12.65 0L21 3v7.12z" fill="currentColor"/>
+			</svg>
+			<span class="update-text">
+				<span data-i18n="neue_version">Neue Version</span>
+				<span data-i18n="verfuegbar">verfügbar</span>
+			</span>
+			<span class="update-version" id="update-available-version">-</span>
+		</div>
+	</div>
+
+	<div id="slideInContainer">
+		<div id="slideInFrames">
+			<div>
+				<iframe id="slideInFrame1"  scrolling="no" src=""></iframe>
+			</div>
+			<div class= "placeholder"></div>
+			<div>
+				<iframe id="slideInFrame2"  scrolling="no" src=""></iframe>
+			</div>
+			<div class= "placeholder"></div>
+			<div>
+				<iframe id="slideInFrame3" scrolling="no" src=""></iframe>
+			</div>
+		</div>
+		<div id = "slideInButtonWrapper">
+
+		</div>
+	</div>
+</div>
+<script>
+  (function(){
+    var logoC = document.getElementById('logoContainer');
+    if (!logoC) return;
+    logoC.style.cursor = 'pointer';
+    // Logo link is now handled by OEM branding logic below
+  })();
+
+	(function(){
+	  const wrapper = document.getElementById('visuWrapper');
+	  const radios  = document.querySelectorAll('#backgroundDotsContainer input[name="bg"]');
+	  const STORAGE_KEY = 'selectedBg';
+
+	  // Funktion zum Setzen des Hintergrunds
+	  function setBg(val) {
+	    const url = val === '1'
+	      ? '/img/background1.webp'
+	      : val === '2'
+			? '/img/background2.webp'
+			: '/img/background3.webp';
+	    wrapper.style.backgroundImage = `url("${url}")`;
+	  }
+
+	  // 1) Initial: aus localStorage laden (oder default = '1')
+	  const saved = localStorage.getItem(STORAGE_KEY) || '1';
+	  // Hintergund setzen
+	  setBg(saved);
+	  // Richtige Radio-Option aktivieren
+	  const initRadio = document.getElementById('bg' + saved);
+	  if (initRadio) initRadio.checked = true;
+
+	  // 2) Listener: speichern und anwenden
+	  radios.forEach(radio => {
+	    radio.addEventListener('change', () => {
+	      if (!radio.checked) return;
+	      const val = radio.value;
+	      // Speichern
+	      localStorage.setItem(STORAGE_KEY, val);
+	      // Anwenden
+	      setBg(val);
+	    });
+	  });
+	})();
+
+	// OEM Branding Handler
+	(function(){
+	  // Warte auf webMI
+	  function waitForWebMI() {
+	    if (typeof webMI === 'undefined' || !webMI.data) {
+	      setTimeout(waitForWebMI, 100);
+	      return;
+	    }
+
+	    // Subscribe to OEM brand changes
+	    webMI.data.subscribe('./settings/oem/brand', function(e) {
+	      const brand = (e.value || 'heliotherm').toLowerCase();
+	      console.log('[OEM] Brand:', brand);
+
+	      // 1. Favicon austauschen
+	      const favicon = document.querySelector('link[rel="shortcut icon"]');
+	      if (favicon) {
+	        if (brand === 'windhager') {
+	          favicon.href = '/img/favicon_windhager.png';
+	        } else {
+	          favicon.href = '/img/favicon.ico';
+	        }
+	      }
+
+	      // 2. Logo austauschen
+	      const logoImg = document.getElementById('logo');
+	      const logoContainer = document.getElementById('logoContainer');
+	      if (logoImg && logoContainer) {
+	        if (brand === 'windhager') {
+	          logoImg.src = '/img/logo_windhager.svg';
+	          logoContainer.onclick = function() {
+	            window.open('https://www.windhager.com/');
+	          };
+	        } else {
+	          logoImg.src = '/img/logo.png';
+	          logoContainer.onclick = function() {
+	            window.open('https://www.heliotherm.com/');
+	          };
+	        }
+	      }
+
+	      // 3. Edelweiss-Container ausblenden (und Icon ersetzen wenn sichtbar)
+	      const edelweissContainer = document.getElementById('edelweissContainer');
+	      if (edelweissContainer) {
+	        if (brand === 'windhager') {
+	          edelweissContainer.style.display = 'none';
+	        } else {
+	          edelweissContainer.style.display = '';
+	          // Stelle sicher, dass Edelweiss-Icon korrekt ist
+	          const edelweissIcon = edelweissContainer.querySelector('.edelweiss-icon');
+	          if (edelweissIcon) {
+	            edelweissIcon.src = '/img/edelweis.svg';
+	          }
+	        }
+	      }
+
+	      // 4. Hintergrund-Dots ausblenden
+	      const bgDotsContainer = document.getElementById('backgroundDotsContainer');
+	      if (bgDotsContainer) {
+	        bgDotsContainer.style.display = (brand === 'windhager') ? 'none' : '';
+	      }
+
+	      // 5. Loading-Screen Logo
+	      const loadingLogo = document.querySelector('#loadingbox .loading-logo');
+	      if (loadingLogo) {
+	        if (brand === 'windhager') {
+	          loadingLogo.src = '/img/logo_windhager.svg';
+	          loadingLogo.alt = 'Windhager';
+	        } else {
+	          loadingLogo.src = '/img/edelweis.svg';
+	          loadingLogo.alt = 'Heliotherm';
+	        }
+	        // Show logo after setting (was initially hidden)
+	        loadingLogo.style.opacity = '1';
+	      }
+	    });
+	  }
+
+	  waitForWebMI();
+	})();
+
+	// Global Clock Script
+	(function(){
+		// Default month names (German)
+		var defaultMonthNames = ['', 'JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
+
+		// Get month name from i18n or fallback
+		function getMonthName(monthNum) {
+			var i18n = window.i18n || {};
+			var key = 'month_' + String(monthNum).padStart(2, '0');
+			return i18n[key] || defaultMonthNames[monthNum] || 'DEZ';
+		}
+
+		// Store last known values for re-rendering on language change
+		var lastTimeValue = null;
+
+		function updateClockDisplay(dateStr) {
+			if (!dateStr || typeof dateStr !== 'string') return;
+
+			var parts = dateStr.split(' ');
+			if (parts.length >= 2) {
+				var timePart = parts[1];
+				var dateParts = parts[0].split('.');
+
+				var timeEl = document.getElementById('global-clock-time');
+				if (timeEl && timePart) {
+					timeEl.textContent = timePart.substring(0, 5);
+				}
+
+				var dateEl = document.getElementById('global-clock-date');
+				if (dateEl && dateParts.length >= 2) {
+					var day = dateParts[0];
+					var monthNum = parseInt(dateParts[1], 10);
+					var month = getMonthName(monthNum);
+					dateEl.textContent = day + ' ' + month;
+				}
+			}
+		}
+
+		function updateClockLocal() {
+			var now = new Date();
+			var hours = String(now.getHours()).padStart(2, '0');
+			var minutes = String(now.getMinutes()).padStart(2, '0');
+			var timeEl = document.getElementById('global-clock-time');
+			if (timeEl) {
+				timeEl.textContent = hours + ':' + minutes;
+			}
+
+			var day = String(now.getDate()).padStart(2, '0');
+			var month = getMonthName(now.getMonth() + 1);
+			var dateEl = document.getElementById('global-clock-date');
+			if (dateEl) {
+				dateEl.textContent = day + ' ' + month;
+			}
+		}
+
+		// Wait for webMI to be available
+		function initGlobalClock() {
+			if (typeof webMI !== 'undefined' && webMI.data) {
+				webMI.data.subscribe('./mcg/data/web/time', function(e) {
+					lastTimeValue = e.value;
+					updateClockDisplay(e.value);
+				});
+				console.log('[GlobalClock] Subscribed to backend time');
+			} else {
+				console.log('[GlobalClock] webMI not available, using local time');
+				updateClockLocal();
+				setInterval(updateClockLocal, 60000);
+			}
+		}
+
+		// Listen for language changes
+		document.addEventListener('languageChanged', function() {
+			console.log('[GlobalClock] Language changed, updating display');
+			if (lastTimeValue) {
+				updateClockDisplay(lastTimeValue);
+			} else {
+				updateClockLocal();
+			}
+		});
+
+		// Initialize when DOM is ready
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', function() {
+				setTimeout(initGlobalClock, 500);
+			});
+		} else {
+			setTimeout(initGlobalClock, 500);
+		}
+
+		// Add click handler to navigate to clock settings
+		const clockContainer = document.getElementById('globalClockContainer');
+		if (clockContainer) {
+			clockContainer.style.cursor = 'pointer';
+			clockContainer.addEventListener('click', function() {
+				console.log('[GlobalClock] Navigating to clock settings');
+				window.location.hash = 'einstellungen-uhr';
+				if (typeof window.navigateToHTMLPage === 'function') {
+					window.navigateToHTMLPage('einstellungen-uhr');
+				}
+			});
+		}
+	})();
+
+	// ==========================================================================
+	// WebRegler Ready System
+	// ==========================================================================
+	// Global system to track when WebRegler initialization is complete.
+	// Components should use window.webReglerReady.onReady() before subscribing
+	// to webregler/mp/* or webregler/sp/* datapoints.
+	//
+	// Usage in components:
+	//   window.webReglerReady.onReady(function() {
+	//       webMI.data.subscribe('./webregler/mp/123/value', callback);
+	//   });
+	//
+	// Or check synchronously:
+	//   if (window.webReglerReady.isReady) { ... }
+	// ==========================================================================
+	window.webReglerReady = (function() {
+		var _isReady = false;
+		var _callbacks = [];
+
+		function _notifyCallbacks() {
+			console.log('[WebReglerReady] Notifying', _callbacks.length, 'waiting callbacks');
+			_callbacks.forEach(function(cb) {
+				try { cb(); } catch(e) { console.error('[WebReglerReady] Callback error:', e); }
+			});
+			_callbacks = [];
+		}
+
+		return {
+			// Check if ready
+			get isReady() { return _isReady; },
+
+			// Register callback - called immediately if already ready
+			onReady: function(callback) {
+				if (_isReady) {
+					try { callback(); } catch(e) { console.error('[WebReglerReady] Callback error:', e); }
+				} else {
+					_callbacks.push(callback);
+				}
+			},
+
+			// Internal: set ready state (called by loading screen)
+			_setReady: function() {
+				if (_isReady) return;
+				_isReady = true;
+				console.log('[WebReglerReady] WebRegler is now ready');
+				_notifyCallbacks();
+				// Also dispatch a custom event for listeners
+				window.dispatchEvent(new CustomEvent('webregler-ready'));
+			}
+		};
+	})();
+
+	// Loading Screen Status Script
+	// Uses initProgress datapoint which persists each step value (not auto-reset)
+	// initProgress values: 0=idle, 5=login, 6=MPs, 7=SPs, 8=TPs, 100=complete, -1=error
+	(function(){
+		var loadingScreen = null;
+		var statusText = null;
+		var initComplete = false;
+		var isFirstInitProgress = true;
+		var lastProgress = 0;
+
+		// Map initProgress values to step IDs and text
+		var progressSteps = {
+			5: { id: 'step-connect', textKey: 'boot_status_connect' },
+			6: { id: 'step-mp', textKey: 'boot_status_mp' },
+			7: { id: 'step-sp', textKey: 'boot_status_sp' },
+			8: { id: 'step-tp', textKey: 'boot_status_tp' },
+			100: { id: 'step-done', textKey: 'boot_status_done' }
+		};
+
+		// Order of steps for completing previous steps
+		var stepOrder = ['step-connect', 'step-mp', 'step-sp', 'step-tp', 'step-done'];
+
+		function hideLoadingScreen(immediate) {
+			if (initComplete || !loadingScreen) return;
+			initComplete = true;
+
+			// Signal that WebRegler is ready
+			window.webReglerReady._setReady();
+
+			console.log('[LoadingScreen] Hiding loading screen' + (immediate ? ' (immediate)' : ''));
+
+			if (immediate) {
+				// Hide immediately without animation (already initialized)
+				loadingScreen.style.display = 'none';
+			} else {
+				// Mark all steps as completed
+				stepOrder.forEach(function(stepId) {
+					setStepCompleted(stepId);
+				});
+				if (statusText) statusText.textContent = (window.i18n && window.i18n['boot_status_done']) || 'Fertig!';
+
+				// Hide loading screen with animation
+				setTimeout(function() {
+					if (loadingScreen) {
+						loadingScreen.style.opacity = '0';
+						loadingScreen.style.transition = 'opacity 0.5s ease';
+						setTimeout(function() {
+							loadingScreen.style.display = 'none';
+						}, 500);
+					}
+				}, 500);
+			}
+		}
+
+		function setStepActive(stepId) {
+			var step = document.getElementById(stepId);
+			if (step) {
+				step.classList.remove('completed');
+				step.classList.add('active');
+			}
+		}
+
+		function setStepCompleted(stepId) {
+			var step = document.getElementById(stepId);
+			if (step) {
+				step.classList.remove('active');
+				step.classList.add('completed');
+			}
+		}
+
+		function updateProgress(value) {
+			if (initComplete) return;
+
+			var numValue = parseInt(value, 10);
+			var wasFirst = isFirstInitProgress;
+			isFirstInitProgress = false;
+
+			console.log('[LoadingScreen] initProgress update:', numValue, wasFirst ? '(first)' : '');
+
+			// If first value is already 100, initialization was already complete
+			if (wasFirst && numValue === 100) {
+				console.log('[LoadingScreen] Already initialized on load - hiding immediately');
+				hideLoadingScreen(true);
+				return;
+			}
+
+			// If progress is 100, hide with animation
+			if (numValue === 100) {
+				console.log('[LoadingScreen] Initialization complete - hiding with animation');
+				hideLoadingScreen(false);
+				return;
+			}
+
+			// If error (-1), show error state
+			if (numValue === -1) {
+				if (statusText) statusText.textContent = (window.i18n && window.i18n['boot_status_error']) || 'Verbindungsfehler - Wiederhole...';
+				return;
+			}
+
+			// Ignore 0 (idle) - keep current state
+			if (numValue === 0) return;
+
+			// Only progress forward, never back (ignore lower values)
+			if (numValue <= lastProgress && lastProgress > 0) {
+				console.log('[LoadingScreen] Ignoring lower progress value');
+				return;
+			}
+			lastProgress = numValue;
+
+			// Get the step info for this progress value
+			var stepInfo = progressSteps[numValue];
+			if (!stepInfo) return;
+
+			// Mark all previous steps as completed
+			var currentStepIndex = stepOrder.indexOf(stepInfo.id);
+			for (var i = 0; i < currentStepIndex; i++) {
+				setStepCompleted(stepOrder[i]);
+			}
+
+			// Set current step as active
+			setStepActive(stepInfo.id);
+			if (statusText) statusText.textContent = (window.i18n && window.i18n[stepInfo.textKey]) || stepInfo.textKey;
+		}
+
+		function initLoadingStatus() {
+			loadingScreen = document.getElementById('loadingscreen');
+			statusText = document.getElementById('loading-status-text');
+
+			// Set initial state
+			setStepActive('step-connect');
+			if (statusText) statusText.textContent = (window.i18n && window.i18n['boot_connecting']) || 'Verbindung wird hergestellt...';
+
+			if (typeof webMI !== 'undefined' && webMI.data) {
+				// Subscribe to initProgress - persisted value that shows real progress
+				webMI.data.subscribe('./mcg/data/web/initProgress', function(e) {
+					updateProgress(e.value);
+				});
+
+				console.log('[LoadingScreen] Subscribed to initProgress');
+			} else {
+				console.log('[LoadingScreen] webMI not available');
+				if (statusText) statusText.textContent = (window.i18n && window.i18n['boot_status_webmi']) || 'WebMI wird geladen...';
+			}
+		}
+
+		// When tab becomes visible again after being hidden, re-check initProgress.
+		// Browser may throttle or close WebSocket in background tabs. If the socket
+		// is dead, webMI.data.read() never fires its callback — self-heal via reload
+		// if no response arrives within a short grace period.
+		var visibilityRecheckPending = false;
+		function recheckInitProgressOnResume() {
+			if (document.hidden || initComplete || !loadingScreen) return;
+			if (visibilityRecheckPending) return;
+			if (typeof webMI === 'undefined' || !webMI.data) return;
+
+			visibilityRecheckPending = true;
+			var responded = false;
+			var reloadTimer = setTimeout(function() {
+				if (responded || initComplete) return;
+				console.log('[LoadingScreen] No response after resume — reloading to recover stale WebSocket');
+				location.reload();
+			}, 3000);
+
+			webMI.data.read('./mcg/data/web/initProgress', function(e) {
+				responded = true;
+				clearTimeout(reloadTimer);
+				visibilityRecheckPending = false;
+				if (e && e.value !== undefined) {
+					var v = parseInt(e.value, 10);
+					console.log('[LoadingScreen] Tab visible again - current initProgress:', v);
+					if (v === 100) {
+						hideLoadingScreen(true);
+					}
+				}
+			});
+		}
+		document.addEventListener('visibilitychange', recheckInitProgressOnResume);
+		window.addEventListener('focus', recheckInitProgressOnResume);
+		window.addEventListener('pageshow', function(ev) {
+			if (ev.persisted) recheckInitProgressOnResume();
+		});
+
+		// Initialize as early as possible
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', function() {
+				setTimeout(initLoadingStatus, 100);
+			});
+		} else {
+			setTimeout(initLoadingStatus, 100);
+		}
+	})();
+
+	// Global Status Indicator Script (Fehler circle)
+	(function(){
+		var statusElement = null;
+
+		// Status states (colour = CSS background-color, animation):
+		// - off:            System powered off (white, static)
+		// - standby:        Idle / no demand, SP10=0 (yellow #ffeb0e, static)
+		// - standby-pulse:  Compressor starting, SP10=1-5 (yellow #ffeb0e, blinking)
+		// - heizung:        Heating active, SP10≥6 (green #6ea439, static)
+		// - warmwasser:     Hot water active, SP10≥6 (blue #3b82f6, static)
+		// - kuehlen:        Cooling active, SP10≥6 (cyan #06b6d4, static)
+		// - abtauung:       Defrost active (orange #ff8c00, static)
+		// - error:          System error (red #ff0000, static)
+
+		// SP 310 (Verdichter Status) text mapping — from SIMM2 SP10 enum (Komp_Ein.h)
+		var sp310Texts = {
+			0:  'Sperrzeit',
+			1:  'VL Umschaltventil',
+			2:  '2.Stufe',
+			3:  'VL Sekundärpumpe',
+			4:  'Komp. FT',
+			5:  'VL Energiequelle',
+			6:  'Einspritzzeit',
+			7:  'Vorregelzeit',
+			8:  'PID Start',
+			9:  'Läuft seit',
+			10: 'Nachlaufzeit'
+		};
+
+		// Format seconds → hh:mm:ss
+		function formatSeconds(s) {
+			s = Math.abs(parseInt(s) || 0);
+			var h = Math.floor(s / 3600);
+			var m = Math.floor((s % 3600) / 60);
+			var sec = s % 60;
+			return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+		}
+
+		// Store current status for hamburger menu sync and language change updates
+		window.currentHeatPumpStatus = {
+			statusClass: 'status-standby',
+			statusKey: 'status_bereit'
+		};
+
+		// Store last known values for re-rendering on language change
+		var lastStatusValues = { haupt: 1, stoerung: 0, verdichter: 0, anforderung: 0, abtauStatus: 0, laufzeit: 0 };
+
+		// On language change: re-run full updateStatus to rebuild tooltip with suffix
+		function updateStatusText() {
+			updateStatus(
+				lastStatusValues.haupt,
+				lastStatusValues.stoerung,
+				lastStatusValues.verdichter,
+				lastStatusValues.anforderung,
+				lastStatusValues.abtauStatus,
+				lastStatusValues.laufzeit
+			);
+		}
+
+		// Listen for language changes
+		document.addEventListener('languageChanged', function() {
+			console.log('[StatusIndicator] Language changed, updating text');
+			updateStatusText();
+		});
+
+		function updateStatus(haupt, stoerung, verdichter, anforderung, abtauStatus, laufzeit) {
+			var verd = parseInt(verdichter) || 0;
+			var lz   = parseInt(laufzeit)  || 0;
+			// Store values for language change re-render
+			lastStatusValues = { haupt: haupt, stoerung: stoerung, verdichter: verd, anforderung: anforderung, abtauStatus: abtauStatus, laufzeit: lz };
+			if (!statusElement) {
+				statusElement = document.getElementById('statusIndicator');
+			}
+			if (!statusElement) return;
+
+			// Remove all status classes
+			statusElement.classList.remove('status-off', 'status-standby', 'status-standby-pulse', 'status-error',
+				'status-heizung', 'status-warmwasser', 'status-kuehlen', 'status-abtauung');
+
+			var statusClass = 'status-standby';
+			var statusKey = 'status_bereit';
+			var showSp310 = false;  // append (SP310 text) to tooltip for priority 4-5 states
+
+			// Priority-based status logic (matches display logic)
+			// 1. Error overrides all
+			// 2. System off
+			// 3. SP10=0: Standby (yellow static)
+			// 4. SP10=1-5: StandbyPulse (yellow blinking)
+			// 5. SP10=6-11: Running (color by mode, static)
+			if (stoerung == 1) {
+				statusClass = 'status-error';
+				statusKey = 'status_stoerung';
+				showSp310 = true;
+			} else if (haupt == 0) {
+				statusClass = 'status-off';
+				statusKey = 'status_aus';
+				showSp310 = true;
+			} else if (abtauStatus >= 2 && abtauStatus <= 5) {
+				statusClass = 'status-abtauung';
+				statusKey = 'status_abtauung';
+			} else if (verd >= 6 && verd <= 11) {
+				// RUNNING - color by mode, static (no blink)
+				showSp310 = true;
+				if (anforderung == 1) {
+					statusClass = 'status-kuehlen';
+					statusKey = 'status_kuehlen';
+				} else if (anforderung == 3) {
+					statusClass = 'status-warmwasser';
+					statusKey = 'status_warmwasser';
+				} else if (anforderung == 2 || anforderung == 5) {
+					statusClass = 'status-heizung';
+					statusKey = 'status_heizung';
+				} else if (anforderung == 4) {
+					statusClass = 'status-heizung';
+					statusKey = 'status_heizung';
+				} else {
+					statusClass = 'status-heizung';
+					statusKey = 'status_heizung';
+				}
+			} else if (verd >= 1 && verd <= 5) {
+				// STANDBY PULSE - compressor starting (yellow blinking)
+				statusClass = 'status-standby-pulse';
+				statusKey = anforderung == 1 ? 'status_kuehlen'
+				          : anforderung == 3 ? 'status_warmwasser'
+				          : anforderung >= 2 ? 'status_heizung'
+				          : 'status_keine_anforderung';
+				showSp310 = true;
+			} else if (verd == 0) {
+				// STANDBY - idle (yellow static)
+				statusClass = 'status-standby';
+				statusKey = anforderung == 1 ? 'status_kuehlen'
+				          : anforderung == 3 ? 'status_warmwasser'
+				          : anforderung >= 2 ? 'status_heizung'
+				          : 'status_keine_anforderung';
+				showSp310 = true;
+			} else {
+				statusClass = 'status-standby';
+				statusKey = 'status_keine_anforderung';
+				showSp310 = true;
+			}
+
+			statusElement.classList.add(statusClass);
+
+			// Get translated text
+			var i18n = window.i18n || {};
+			var fallbackTexts = {
+				'status_stoerung':          'Störung',
+				'status_aus':               'Aus',
+				'status_bereit':            'Bereit',
+				'status_keine_anforderung': 'Keine Anforderung',
+				'status_heizung':           'Heizung',
+				'status_warmwasser':        'Warmwasser',
+				'status_kuehlen':           'Kühlen',
+				'status_abtauung':          'Abtauung'
+			};
+			// When SP10=0 and no active timer (lz=0): no Sperrzeit suffix needed
+			if (verd === 0 && lz === 0) showSp310 = false;
+
+			var statusText = i18n[statusKey] || fallbackTexts[statusKey] || 'Bereit';
+
+			// Append SP310 state in parentheses for priority 4-5 states
+			if (showSp310) {
+				var sp310key = 'sp310_' + verd;
+				// Context-dependent label for SP310=0
+				if (verd === 0 && lz > 0) {
+					if (stoerung == 1) {
+						sp310key = 'sp310_0_stoerung';  // Wiederanlaufsperre
+					} else if (haupt == 0) {
+						sp310key = 'sp310_0_nachlauf';  // Nachlaufzeit
+					}
+				}
+				var sp310text = (i18n && i18n[sp310key]) || (sp310Texts[verd] !== undefined ? sp310Texts[verd] : ('SP310=' + verd));
+				statusText += ' (' + sp310text;
+				// Show SP311 timer for: 0 (Sperrzeit/Wiederanlaufsperre/Nachlaufzeit), 9 (Läuft seit), 10 (Nachlaufzeit/Auslauf)
+				if (verd === 9 || verd === 10 || (verd === 0 && lz > 0)) {
+					statusText += ' ' + formatSeconds(lz);
+				}
+				statusText += ')';
+			}
+
+			// Update tooltip text
+			var tooltipElement = document.getElementById('statusTooltip');
+			if (tooltipElement) {
+				tooltipElement.textContent = statusText;
+			}
+
+			// Store for hamburger menu sync
+			window.currentHeatPumpStatus = {
+				statusClass: statusClass,
+				statusKey: statusKey
+			};
+
+			// Dispatch event for hamburger menu
+			document.dispatchEvent(new CustomEvent('heatpumpStatusChanged', {
+				detail: { statusClass: statusClass, statusKey: statusKey }
+			}));
+		}
+
+		function initHeatingRodIndicator() {
+			var indicator = document.getElementById('heatingRodIndicator');
+			if (!indicator) return;
+			if (typeof webMI !== 'undefined' && webMI.data) {
+				var subscribe = function() {
+					webMI.data.subscribe('./webregler/mp/249/value', function(e) {
+						var val = parseFloat(e.value) || 0;
+						indicator.style.display = val > 0 ? '' : 'none';
+					});
+				};
+				if (window.webReglerReady) {
+					window.webReglerReady.onReady(subscribe);
+				} else {
+					subscribe();
+				}
+			}
+		}
+
+		function initStatusIndicator() {
+			initHeatingRodIndicator();
+
+			// Click on the header status indicator navigates to Meldungen
+			// when an error is currently active — quick shortcut so the user
+			// can jump straight to the error list.
+			var indicatorContainer = document.getElementById('statusIndicatorContainer');
+			if (indicatorContainer && !indicatorContainer.dataset.clickBound) {
+				indicatorContainer.dataset.clickBound = 'true';
+				indicatorContainer.addEventListener('click', function() {
+					var current = window.currentHeatPumpStatus || {};
+					if (current.statusClass === 'status-error') {
+						window.location.hash = 'meldungen';
+					}
+				});
+				// Visual hint: pointer cursor when state is error
+				var applyCursor = function() {
+					var current = window.currentHeatPumpStatus || {};
+					indicatorContainer.style.cursor = current.statusClass === 'status-error' ? 'pointer' : '';
+				};
+				document.addEventListener('heatpumpStatusChanged', applyCursor);
+				applyCursor();
+			}
+
+			if (typeof webMI !== 'undefined' && webMI.data && webMI.data.subscribeBlock) {
+				// Wait for WebRegler to be ready before subscribing to webregler datapoints
+				if (window.webReglerReady) {
+					window.webReglerReady.onReady(function() {
+						// Subscribe to all status datapoints
+						webMI.data.subscribeBlock([
+							'./webregler/mp/236/value',  // HAUPT (Main/On-Off)
+							'./webregler/mp/231/value',  // SUMMENSTOERUNG (Total Error)
+							'./webregler/sp/310/value',  // VERDICHTER (Compressor Status 0-10)
+							'./webregler/mp/256/value',  // Verdichteranforderung
+							'./webregler/mp/2106/value', // Abtaustatus
+							'./webregler/sp/311/value'   // Verdichter Laufzeit (Sekunden)
+						], function(e) {
+							var haupt       = e[0].value;
+							var stoerung    = e[1].value;
+							var verdichter  = e[2].value;
+							var anforderung = parseInt(e[3].value) || 0;
+							var abtauStatus = parseInt(e[4].value) || 0;
+							var laufzeit    = parseInt(e[5].value) || 0;
+							updateStatus(haupt, stoerung, verdichter, anforderung, abtauStatus, laufzeit);
+						});
+						console.log('[StatusIndicator] Subscribed to heat pump status');
+					});
+				} else {
+					// Fallback if webReglerReady not available
+					webMI.data.subscribeBlock([
+						'./webregler/mp/236/value',
+						'./webregler/mp/231/value',
+						'./webregler/sp/310/value',
+						'./webregler/mp/256/value',
+						'./webregler/mp/2106/value',
+						'./webregler/sp/311/value'   // Verdichter Laufzeit (Sekunden)
+					], function(e) {
+						var haupt       = e[0].value;
+						var stoerung    = e[1].value;
+						var verdichter  = e[2].value;
+						var anforderung = parseInt(e[3].value) || 0;
+						var abtauStatus = parseInt(e[4].value) || 0;
+						var laufzeit    = parseInt(e[5].value) || 0;
+						updateStatus(haupt, stoerung, verdichter, anforderung, abtauStatus, laufzeit);
+					});
+					console.log('[StatusIndicator] Subscribed to heat pump status (no webReglerReady)');
+				}
+			} else {
+				console.log('[StatusIndicator] webMI not available, using default status');
+				// Default to running state for demo
+				updateStatus(1, 0, 9, 2, 0, 3723);
+			}
+		}
+
+		// Initialize when DOM is ready
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', initStatusIndicator);
+		} else {
+			initStatusIndicator();
+		}
+	})();
+
+	// Dynamic Title Script - Shows WebRegler serial number in title
+	(function(){
+		function initDynamicTitle() {
+			if (typeof webMI !== 'undefined' && webMI.data) {
+				webMI.data.subscribe('./mcg/data/web/serialnr', function(e) {
+					var serial = e.value;
+					if (serial && serial !== '-' && serial !== '') {
+						document.title = serial + ' | WebControl';
+					} else {
+						document.title = 'WebControl';
+					}
+				});
+				console.log('[DynamicTitle] Subscribed to WebRegler serial number');
+			} else {
+				console.log('[DynamicTitle] webMI not available');
+			}
+		}
+
+		// Initialize when DOM is ready
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', function() {
+				setTimeout(initDynamicTitle, 600);
+			});
+		} else {
+			setTimeout(initDynamicTitle, 600);
+		}
+	})();
+
+	// Global Update Notification Script
+	(function(){
+		var updateNotification = null;
+		var versionDisplay = null;
+
+		function initUpdateNotification() {
+			updateNotification = document.getElementById('updateNotification');
+			versionDisplay = document.getElementById('update-available-version');
+
+			if (!updateNotification) return;
+
+			// Click handler to navigate to update page
+			updateNotification.addEventListener('click', function() {
+				window.location.hash = 'einstellungen-update';
+				if (typeof window.navigateToHTMLPage === 'function') {
+					window.navigateToHTMLPage('einstellungen-update');
+				}
+			});
+
+			if (typeof webMI !== 'undefined' && webMI.data) {
+				// Subscribe to startEnable - controls visibility (set by server when update available)
+				webMI.data.subscribe('./settings/update/startEnable', function(e) {
+					if (e.value === true || e.value === 'true' || e.value == 1) {
+						updateNotification.classList.add('visible');
+						console.log('[UpdateNotification] Update available (startEnable=true)');
+					} else {
+						updateNotification.classList.remove('visible');
+					}
+				});
+
+				// Subscribe to server version for display
+				webMI.data.subscribe('./mcg/data/srvVersion', function(e) {
+					if (versionDisplay && e.value) {
+						versionDisplay.textContent = e.value;
+					}
+				});
+
+				console.log('[UpdateNotification] Subscribed to update datapoints');
+			} else {
+				console.log('[UpdateNotification] webMI not available');
+			}
+		}
+
+		// Initialize when DOM is ready
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', function() {
+				setTimeout(initUpdateNotification, 700);
+			});
+		} else {
+			setTimeout(initUpdateNotification, 700);
+		}
+	})();
+</script>
+
+<!-- Modern HMI Components and Navigation -->
+<script type="module">
+	// Import HMI Components (registers custom elements)
+	import '/components/index.js';
+
+	// Import Navigation Controller
+	import { NavigationController } from '/js/navigation-controller.js';
+
+	// Create global navigation controller instance
+	window.hmiNav = new NavigationController('html-page-container');
+
+	// Configure which pages are HTML (migrated) vs SVG (legacy)
+	window.hmiNav.registerPage('default', {
+		file: 'pages/default.html',
+		title: 'Home',
+		svgEquivalent: 'Default_Landscape'
+	});
+
+	window.hmiNav.registerPage('betriebsart', {
+		file: 'pages/betriebsart.html',
+		title: 'Betriebsart',
+		svgEquivalent: 'Betriebsart_Main_Landscape'
+	});
+
+	window.hmiNav.registerPage('temperatur', {
+		file: 'pages/temperatur.html',
+		title: 'Temperatur',
+		svgEquivalent: 'Temperatur_Main_Landscape'
+	});
+
+	// Function to switch between iframe and HTML page container
+	window.showHTMLPage = function(show) {
+		const iframe = document.getElementById('mainframe');
+		const htmlContainer = document.getElementById('html-page-container');
+		// Note: Loading screen is now controlled by initProgress subscription
+		// const loadingScreen = document.getElementById('loadingscreen');
+
+		if (show) {
+			// Hide iframe if it exists (may be commented out)
+			if (iframe) {
+				iframe.style.display = 'none';
+			}
+			htmlContainer.style.display = 'block';
+			// Loading screen hiding is now handled by the Loading Screen Status Script
+			// which monitors ./mcg/data/web/initProgress
+		} else {
+			// Show iframe if it exists (may be commented out)
+			if (iframe) {
+				iframe.style.display = 'block';
+			}
+			htmlContainer.style.display = 'none';
+		}
+	};
+
+	// Navigate to HTML page (use this instead of changing mainframe.src for migrated pages)
+	window.navigateToHTMLPage = async function(pageId) {
+		window.showHTMLPage(true);
+		await window.hmiNav.navigate(pageId);
+	};
+
+	// Navigate to legacy SVG page (fallback to original iframe behavior)
+	// Note: Currently disabled since iframe is commented out
+	window.navigateToSVGPage = function(displayId) {
+		if (!displayId) {
+			console.warn('[HMI] navigateToSVGPage called without displayId');
+			return;
+		}
+		const iframe = document.getElementById('mainframe');
+		if (!iframe) {
+			console.warn('[HMI] Legacy SVG navigation not available (iframe removed). Display:', displayId);
+			return;
+		}
+		window.showHTMLPage(false);
+		const display = typeof getDisplay === 'function' ? getDisplay(displayId) : displayId;
+		if (!display) {
+			console.warn('[HMI] Could not resolve display for:', displayId);
+			return;
+		}
+		const url = webMI.display.createURL(display);
+		iframe.src = url;
+	};
+
+	// Handle hash-based navigation for HTML pages
+	// Supports query parameters: #trend?diag_t=123 → navigates to 'trend'
+	// with the full hash preserved for the page script to read.
+	function handleHashNavigation() {
+		const hash = window.location.hash.slice(1); // Remove #
+		const pageId = hash.split('?')[0]; // Strip query params for page lookup
+		if (pageId && window.hmiNav.isHTMLPage(pageId)) {
+			console.log('[HMI] Hash navigation to:', pageId, '(full hash:', hash, ')');
+			window.navigateToHTMLPage(pageId);
+			return true;
+		}
+		return false;
+	}
+
+	// Listen for hash changes
+	window.addEventListener('hashchange', handleHashNavigation);
+
+	// Check initial hash on page load
+	const navigatedByHash = handleHashNavigation();
+
+	// Ensure a deterministic initial page if no hash is present/valid.
+	// This avoids a startup race where default navigation can be missed
+	// if navigateToHTMLPage was not yet available in earlier init code.
+	if (!navigatedByHash) {
+		console.log('[HMI] No valid hash found, loading default page');
+		window.navigateToHTMLPage('default');
+	}
+
+	console.log('[HMI] Modern navigation controller initialized');
+	console.log('[HMI] Available HTML pages:', Object.keys(window.hmiNav.pages));
+</script>
+
+<!-- Auto-Reconnect Handler: Automatically reload page when connection is restored -->
+<script>
+(function() {
+	'use strict';
+
+	var wasDisconnected = false;
+	var reconnectCheckInterval = null;
+	var RECONNECT_CHECK_MS = 2000; // Check every 2 seconds
+
+	function checkConnection() {
+		if (typeof webMI === 'undefined' || !webMI.data) {
+			return;
+		}
+
+		// Try to read a value to check if connection is back
+		webMI.data.call("read", "", function(e) {
+			var isConnected = e["result"] || e["error"] > -1000;
+
+			if (isConnected && wasDisconnected) {
+				console.log('[AutoReconnect] Connection restored, reloading page...');
+				// Small delay to ensure server is fully ready
+				setTimeout(function() {
+					window.location.reload(true);
+				}, 500);
+			}
+		});
+	}
+
+	function onDisconnect() {
+		if (!wasDisconnected) {
+			wasDisconnected = true;
+			console.log('[AutoReconnect] Connection lost, starting reconnect monitor...');
+
+			// Start checking for reconnection
+			if (!reconnectCheckInterval) {
+				reconnectCheckInterval = setInterval(checkConnection, RECONNECT_CHECK_MS);
+			}
+		}
+	}
+
+	function onConnect() {
+		if (wasDisconnected) {
+			// Connection restored - reload will happen in checkConnection
+			console.log('[AutoReconnect] Connection state changed to connected');
+		}
+		wasDisconnected = false;
+
+		// Clear interval when connected
+		if (reconnectCheckInterval) {
+			clearInterval(reconnectCheckInterval);
+			reconnectCheckInterval = null;
+		}
+	}
+
+	// Wait for webMI to be available
+	function initAutoReconnect() {
+		if (typeof webMI === 'undefined' || !webMI.data) {
+			setTimeout(initAutoReconnect, 500);
+			return;
+		}
+
+		// Listen for state changes
+		webMI.addEvent(webMI.data, "statechange", function(state) {
+			console.log('[AutoReconnect] State changed:', state);
+			if (state < 0) {
+				onDisconnect();
+			} else {
+				onConnect();
+			}
+		});
+
+		console.log('[AutoReconnect] Initialized - will auto-reload on reconnection');
+	}
+
+	// Initialize when DOM is ready
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initAutoReconnect);
+	} else {
+		setTimeout(initAutoReconnect, 1000);
+	}
+})();
+</script>
+</body>
+</html>

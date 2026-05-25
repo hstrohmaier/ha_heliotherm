@@ -7,6 +7,7 @@
           "host": "Host",
           "port": "Port",
           "hostid": "Host ID",
+          "firmware": "Firmware",
           "scan_interval": "Abfrage-Intervall"
         }
       }
@@ -20,6 +21,7 @@
           "host": "Host",
           "port": "Port",
           "hostid": "Host ID",
+          "firmware": "Firmware",
           "scan_interval": "Abfrage-Intervall"
         }
       }
@@ -222,6 +224,15 @@
       },
       "switch_tf22_hand_aktiv": {
         "name": "TF22 Hand-Aktiv"
+      },
+      "switch_zirkulationspumpe_ww_handwert": {
+        "name": "Zirkulationspumpe Handwert"
+      },
+      "switch_zirkulationspumpe_ww_hand_aktiv": {
+        "name": "Zirkulationspumpe Hand-Aktiv"
+      },
+      "climate_raumfuehler_1_hand_aktiv": {
+        "name": "Raumfühler 1 Hand-Aktiv"
       }
     },
     "select": {
@@ -277,6 +288,9 @@
       },
       "climate_ww_normaltemperatur": {
         "name": "WW Normaltemperatur"
+      },
+      "climate_fws_zieltemperatur": {
+        "name": "FWS Zieltemperatur"
       },
       "climate_ww_minimaltemperatur": {
         "name": "WW Minimaltemperatur"
@@ -373,6 +387,9 @@
       },
       "input_tf22_handwert": {
         "name": "TF22 Handwert"
+      },
+      "climate_raumfuehler_1_handwert": {
+        "name": "Raumfühler 1 Handwert"
       }
     },
     "climate": {
@@ -475,6 +492,7 @@
       "climate_mkr2_ruecklaufsoll_bei_15_c": {
         "name": "MKR2 Rücklaufsoll bei -15°C"
       }
+
     }
   }
 }
