@@ -27,6 +27,8 @@ from homeassistant.core import HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
 
+from .webmi_version import detect_firmware_version
+
 from . import const
 from .const import (
     DEFAULT_NAME,
@@ -98,13 +100,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     _LOGGER.info("Setup %s.%s", DOMAIN, name)
 
-    version = entry.options.get(CONF_FIRMWARE, None)
-    #version = await hub.detect_firmware_version()
-    _LOGGER.info(f"Firmware-Version: {version}")
-    const.init(version, force=True)
-
     hub = MyModbusHub(hass, name, host, port, scan_interval, hostid)
-    # """Register the hub."""
+
+    version = await hub.detect_firmware_version()
+    if not version:
+        version = entry.options.get(CONF_FIRMWARE, None)
+
+    _LOGGER.info(f"Firmware-Version: {version}")
+
+    const.init(version)
+
     hass.data[DOMAIN][name] = {"hub": hub}
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -179,6 +184,9 @@ class MyModbusHub:
             self._unsub_interval_method()
             self._unsub_interval_method = None
             self.close()
+
+    async def detect_firmware_version(self) -> str | None:
+        return await detect_firmware_version(self._hass, self._client.comm_params.host)
 
     async def async_refresh_modbus_data(self, _now: Optional[int] = None) -> None:
         """Time to update."""
