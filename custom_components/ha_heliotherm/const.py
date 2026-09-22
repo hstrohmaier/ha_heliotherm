@@ -14,7 +14,12 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
 )
 from homeassistant.components.select import SelectEntityDescription
-from homeassistant.components.sensor import *
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -31,6 +36,7 @@ from homeassistant.const import (
     UnitOfEnergy,
     UnitOfPower,
     CONF_NAME,
+    EntityCategory,
     Platform,
 )
 
@@ -782,15 +788,14 @@ def init(detected_version:str|None = None, force: bool = False):
     NUMBER_TYPES = {}
     BINARY_TYPES = {}
     ha_entities = []
-    # Companion entities referenced via "HA" are normally kept internal and therefore
-    # do not become visible Home Assistant entities. That model is problematic for
-    # Rücklaufsolltemperatur: writing REG 102 only makes sense together with REG 103
-    # (Hand-Aktiv), and without a visible way to switch REG 103 back to 0 the user
-    # cannot reliably return that path to Automatik from HA. For now we expose only
-    # this one companion entity as the narrowest fix for the known 102/103 issue
-    # discussed in mbuchber/ha_heliotherm#68, without flooding HA with every other
-    # hand_aktiv helper before their UX/behavior is reviewed.
-    exposed_companion_entities = {C_RUECKLAUFSOLLTEMPERATUR_HAND_AKTIV}
+    # Companion entities referenced via "HA" (Hand-Aktiv) are always created as
+    # regular entities, but tagged with entity_category=CONFIG. Home Assistant
+    # groups CONFIG entities into a separate "Configuration" section on the
+    # device page instead of the main entity list, so they stay reachable
+    # (e.g. to switch a register back to "Automatik") without flooding the
+    # dashboard. This generalizes the earlier one-off fix for
+    # mbuchber/ha_heliotherm#68 (which exposed only the Rücklaufsolltemperatur
+    # Hand-Aktiv switch) to all Handwert/Hand-Aktiv register pairs.
 
     ENTITIES_DICT = build_entities_dict(detected_version)
 
@@ -803,102 +808,103 @@ def init(detected_version:str|None = None, force: bool = False):
         if entity_ha:
             ha_entities.append(entity_ha)
 
-        if (entity_key not in ha_entities) or (entity_key in exposed_companion_entities):
+        entity_category = (
+            EntityCategory.CONFIG if entity_key in ha_entities else None
+        )
 
-            match registerclass:
-                case thismodule.MySensorEntityDescription:
-                    unit, device_class, state_class = _unit_mapping(get_entity_unit(props))
-                    _LOGGER.debug(f"Sensor {entity_key}: {name}, Einheit {unit}")
-                    SENSOR_TYPES[entity_key] = registerclass(
-                        name=name,
-                        key=entity_key,
-                        translation_key=entity_key,
-                        native_unit_of_measurement=unit,
-                        device_class=device_class,
-                        state_class=state_class,
-                    )
+        match registerclass:
+            case thismodule.MySensorEntityDescription:
+                unit, device_class, state_class = _unit_mapping(get_entity_unit(props))
+                _LOGGER.debug(f"Sensor {entity_key}: {name}, Einheit {unit}")
+                SENSOR_TYPES[entity_key] = registerclass(
+                    name=name,
+                    key=entity_key,
+                    translation_key=entity_key,
+                    native_unit_of_measurement=unit,
+                    device_class=device_class,
+                    state_class=state_class,
+                )
 
-                case thismodule.MyBinarySensorEntityDescription:
-                    _LOGGER.debug(f"Binär-Sensor {entity_key}: {name}")
-                    BINARYSENSOR_TYPES[entity_key] = registerclass(
-                        name=name,
-                        key=entity_key,
-                        translation_key=entity_key,
-                    )
+            case thismodule.MyBinarySensorEntityDescription:
+                _LOGGER.debug(f"Binär-Sensor {entity_key}: {name}")
+                BINARYSENSOR_TYPES[entity_key] = registerclass(
+                    name=name,
+                    key=entity_key,
+                    translation_key=entity_key,
+                )
 
-                case thismodule.MyClimateEntityDescription:
-                    #key = f"{C_PREFIX_CLIMATE}_{entity_key}"
-                    min_value=get_entity_min(props)
-                    max_value=get_entity_max(props)
-                    step=get_entity_step(props)
-                    hvac_modes=get_entity_hvac_modes(props)
-                    temperature_unit=get_entity_unit(props)
-                    _LOGGER.debug(
-                        f"Temperatur-Stellwert {entity_key}: {name}, {min_value}-{max_value}{temperature_unit} in {step}-er Schritten"
-                    )
-                    CLIMATE_TYPES[entity_key] = registerclass(
-                        name=name,
-                        key=entity_key,
-                        translation_key=entity_key,
-                        min_value=min_value,
-                        max_value=max_value,
-                        step=step,
-                        hvac_modes=hvac_modes,
-                        temperature_unit=temperature_unit,
-                        supported_features=props.get(
-                            "FEATURES", ClimateEntityFeature.TARGET_TEMPERATURE
-                        ),
-                    )
+            case thismodule.MyClimateEntityDescription:
+                #key = f"{C_PREFIX_CLIMATE}_{entity_key}"
+                min_value=get_entity_min(props)
+                max_value=get_entity_max(props)
+                step=get_entity_step(props)
+                hvac_modes=get_entity_hvac_modes(props)
+                temperature_unit=get_entity_unit(props)
+                _LOGGER.debug(
+                    f"Temperatur-Stellwert {entity_key}: {name}, {min_value}-{max_value}{temperature_unit} in {step}-er Schritten"
+                )
+                CLIMATE_TYPES[entity_key] = registerclass(
+                    name=name,
+                    key=entity_key,
+                    translation_key=entity_key,
+                    min_value=min_value,
+                    max_value=max_value,
+                    step=step,
+                    hvac_modes=hvac_modes,
+                    temperature_unit=temperature_unit,
+                    supported_features=props.get(
+                        "FEATURES", ClimateEntityFeature.TARGET_TEMPERATURE
+                    ),
+                )
 
-                case thismodule.MyNumberEntityDescription:
-                    #key = f"{C_PREFIX_NUMBER}_{entity_key}"
-                    min_value=get_entity_min(props)
-                    max_value=get_entity_max(props)
-                    step=get_entity_step(props)
-                    unit_of_measurement=get_entity_unit(props)
-                    _LOGGER.debug(
-                        f"Numerischer Stellwert {entity_key}: {name}, {min_value}-{max_value}{unit_of_measurement} in {step}-er Schritten"
-                    )
-                    NUMBER_TYPES[entity_key] = registerclass(
-                        name=name,
-                        key=entity_key,
-                        translation_key=entity_key,
-                        min_value=min_value,
-                        max_value=max_value,
-                        step=step,
-                        unit_of_measurement=unit_of_measurement,
-                        editable=is_entity_readwrite(props),
-                        mode="box"
-                    )
+            case thismodule.MyNumberEntityDescription:
+                #key = f"{C_PREFIX_NUMBER}_{entity_key}"
+                min_value=get_entity_min(props)
+                max_value=get_entity_max(props)
+                step=get_entity_step(props)
+                unit_of_measurement=get_entity_unit(props)
+                _LOGGER.debug(
+                    f"Numerischer Stellwert {entity_key}: {name}, {min_value}-{max_value}{unit_of_measurement} in {step}-er Schritten"
+                )
+                NUMBER_TYPES[entity_key] = registerclass(
+                    name=name,
+                    key=entity_key,
+                    translation_key=entity_key,
+                    min_value=min_value,
+                    max_value=max_value,
+                    step=step,
+                    unit_of_measurement=unit_of_measurement,
+                    editable=is_entity_readwrite(props),
+                    mode="box"
+                )
 
-                case thismodule.MyBinaryEntityDescription:
-                    #key = f"{C_PREFIX_SWITCH}_{entity_key}"
-                    _LOGGER.debug(f"Schalter {entity_key}: {name}")
-                    BINARY_TYPES[entity_key] = registerclass(
-                        name=name,
-                        key=entity_key,
-                        translation_key=entity_key,
-                    )
+            case thismodule.MyBinaryEntityDescription:
+                #key = f"{C_PREFIX_SWITCH}_{entity_key}"
+                _LOGGER.debug(f"Schalter {entity_key}: {name}")
+                BINARY_TYPES[entity_key] = registerclass(
+                    name=name,
+                    key=entity_key,
+                    translation_key=entity_key,
+                    entity_category=entity_category,
+                )
 
-                case thismodule.MySelectEntityDescription:
-                    #key = f"{C_PREFIX_SELECT}_{entity_key}"
-                    values, default = get_entity_select_values_and_default(props)
-                    _LOGGER.debug(
-                        f"Auswahl-Entität {entity_key}: {name}, Werte-Bereich: {values}, Default: {default}"
-                    )
-                    SELECT_TYPES[entity_key] = registerclass(
-                        name=name,
-                        key=entity_key,
-                        translation_key=entity_key,
-                        options=values,
-                        default_select_option=default,
-                    )
+            case thismodule.MySelectEntityDescription:
+                #key = f"{C_PREFIX_SELECT}_{entity_key}"
+                values, default = get_entity_select_values_and_default(props)
+                _LOGGER.debug(
+                    f"Auswahl-Entität {entity_key}: {name}, Werte-Bereich: {values}, Default: {default}"
+                )
+                SELECT_TYPES[entity_key] = registerclass(
+                    name=name,
+                    key=entity_key,
+                    translation_key=entity_key,
+                    options=values,
+                    default_select_option=default,
+                )
 
-                case _:
-                    _LOGGER.warning(f"Unbekannter Entitätstyp {entity_key}: {props}")
-                    print(f"Sensor konnte nicht zugeordnet werden: {entity_key}/{name}")
-        else:
-            _LOGGER.debug(f"Hand-Aktiv-Schalter {entity_key} wird nur intern genutzt und nicht in HA bereitgestellt.")
+            case _:
+                _LOGGER.warning(f"Unbekannter Entitätstyp {entity_key}: {props}")
+                print(f"Sensor konnte nicht zugeordnet werden: {entity_key}/{name}")
 
     _LOGGER.debug(
         f"Status-Register (r/o) von {C_MIN_INPUT_REGISTER} bis {C_MAX_INPUT_REGISTER}"

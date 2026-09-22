@@ -231,7 +231,7 @@
       "switch_zirkulationspumpe_ww_hand_aktiv": {
         "name": "Circulation pump manual active"
       },
-      "climate_raumfuehler_1_hand_aktiv": {
+      "switch_raumfuehler_1_hand_aktiv": {
         "name": "Room sensor 1 manual active"
       }
     },
