@@ -2,15 +2,15 @@
     "domain": "ha_heliotherm",
     "name": "HaHeliotherm",
     "codeowners": [
-        "@mbuchber"
+        "@hstrohmaier"
     ],
     "config_flow": true,
     "dependencies": [],
-    "documentation": "https://github.com/mbuchber/ha_heliotherm/",
+    "documentation": "https://github.com/hstrohmaier/ha_heliotherm/",
     "iot_class": "local_polling",
-    "issue_tracker": "https://github.com/mbuchber/ha_heliotherm/issues",
+    "issue_tracker": "https://github.com/hstrohmaier/ha_heliotherm/issues",
     "requirements": [
         "pymodbus"
     ],
-    "version": "1.0.54"
+    "version": "1.0.55"
 }
