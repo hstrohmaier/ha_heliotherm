@@ -45,9 +45,10 @@ In `const.py` wird diese Kopplung über das Feld `"HA": <entity_key des Hand-Akt
 ## Hub (`MyModbusHub` in `__init__.py`)
 
 - Pollt alle Register alle N Sekunden (Default 15) über `async_refresh_modbus_data()`. Der komplette Zyklus Connect → Lesen → Close läuft über `_do_read_cycle()` in einem Executor-Thread **unter einem einzigen `self._lock`**.
-- Schreiben über `hub.write_entity_value(entity_key, value)` — kodiert den Wert und löst danach automatisch einen Refresh aus. `_write_modbus_registers()` hält `self._lock` ebenfalls über den kompletten Connect → Schreiben → Close-Zyklus.
+- Schreiben über `hub.write_entity_value(entity_key, value)` — kodiert den Wert und schreibt ihn per Modbus. `_write_modbus_registers()` hält `self._lock` ebenfalls über den kompletten Connect → Schreiben → Close-Zyklus.
 - **Wichtig:** Der Lock muss immer den gesamten Connect-Betrieb-Close-Zyklus umschließen, nie nur einzelne Read-/Write-Aufrufe. Andernfalls können gleichzeitige Lese- und Schreibzugriffe denselben TCP-Socket parallel benutzen und zu `EBADF`/"bad file descriptor"-Fehlern führen. 
-- Modbus-Antworten beim Schreiben (`write_coil`/`write_register`) werden über `response.isError()` geprüft und im Fehlerfall geloggt (siehe Known Issues zur Race Condition, die trotzdem bestehen bleibt).
+- Modbus-Antworten beim Schreiben (`write_coil`/`write_register`) werden über `response.isError()` geprüft und im Fehlerfall geloggt.
+- `write_entity_value()` löst **bewusst keinen sofortigen Re-Read** nach dem Schreiben aus (siehe "Gelöste Probleme" unten) — Entities zeigen den optimistisch gesetzten Wert, bis der nächste planmäßige Poll ihn bestätigt.
 - Entity-Callbacks werden über `hub.async_add_my_modbus_sensor(callback)` registriert.
 
 ## Entity-Update-Flow
@@ -66,9 +67,10 @@ Bereits aus `ha_comfoconnectpro` übernommene Fixes (Stand: Portierung auf Basis
 - `_write_modbus_registers()`: Antwort von `write_coil`/`write_register` wird jetzt per `isError()` geprüft und geloggt, statt sie stillschweigend zu verwerfen.
 - `async_refresh_modbus_data()`/`read_modbus_registers()`: kompletter Connect→Lesen→Close-Zyklus läuft jetzt unter einem einzigen Lock im Executor-Thread (siehe Hub-Abschnitt oben).
 
-## Bekannte, ungelöste Probleme (auch in ha_comfoconnectpro offen)
+## Gelöste Probleme
 
-- **Switch-/Coil-Zustand springt 1–3 Sekunden nach dem Schreiben zurück** ([ha_comfoconnectpro#23](https://github.com/hstrohmaier/ha_comfoconnectpro/issues/23)): `write_entity_value()` löst direkt nach dem Schreiben einen `async_refresh_modbus_data()`-Zyklus aus. Hat die Wärmepumpe/das Gerät den Schreibzugriff zu diesem Zeitpunkt noch nicht verarbeitet, liefert der sofortige Re-Read den alten Wert zurück und die Entität springt kurzzeitig auf den ursprünglichen Zustand zurück. Vermutete Ursache laut Issue: derselbe Race-Condition-Musterfehler wie in home-assistant/core#53826 / #53948 (State-Verifikation liest einen veralteten Wert direkt nach dem Schreiben). **Noch nicht behoben** — weder hier noch in `ha_comfoconnectpro`. Ein Fix müsste vermutlich entweder eine kurze Verzögerung/einen Retry vor dem Post-Write-Refresh einbauen oder sich auf den optimistisch gesetzten Entitätszustand verlassen, statt sofort neu zu lesen.
+- **Switch-/Number-/Climate-Wert sprang 1–3 Sekunden nach dem Schreiben zurück** ([ha_comfoconnectpro#23](https://github.com/hstrohmaier/ha_comfoconnectpro/issues/23)): `write_entity_value()` löste bis einschließlich Version 1.0.55 direkt nach dem Schreiben einen `async_refresh_modbus_data()`-Zyklus aus. Hatte die Wärmepumpe den Schreibzugriff zu diesem Zeitpunkt noch nicht intern übernommen, lieferte der sofortige Re-Read den alten Wert zurück und die Entität sprang kurzzeitig auf den ursprünglichen Zustand zurück (derselbe Race-Condition-Musterfehler wie in home-assistant/core#53826 / #53948). Betraf nicht nur Switches/Coils, sondern jede beschreibbare Entität (Number, Climate, Select), da alle über dieselbe `write_entity_value()`-Funktion schreiben.
+  **Fix (ab 1.0.56):** Der sofortige Re-Read nach dem Schreiben wurde ersatzlos entfernt. Alle schreibbaren Entitäten setzen ihren Wert ohnehin bereits optimistisch selbst (`_attr_native_value`/`_attr_target_temperature`/`_attr_is_on` vor dem eigentlichen Hub-Schreibaufruf, siehe z. B. `climate.py:set_temperature()`, `number.py:async_set_native_value()`, `switch.py:async_turn_on/off()`). Der reguläre, periodische Poll (`async_refresh_modbus_data()`, Standard alle 15 s) bestätigt den tatsächlichen Gerätezustand kurz danach ohnehin. Zuerst in `ha_comfoconnectpro` verifiziert (dort reproduzierbar über den ComfoCool-Schalter), anschließend hier identisch übernommen.
 
 ## Linting
 
