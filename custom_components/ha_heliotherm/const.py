@@ -373,6 +373,9 @@ ENTITY_PATCHES = [
             C_N_SOLL_VERDICHTER: {"FAKTOR": 0.1, "UNIT": "%",},
             C_EXPANSIONSVENTIL: {"UNIT": "%",},
             C_TF22_HANDWERT: {"FAKTOR": 0.1, "UNIT": "°C",},
+            # WMZ Leistung kann negativ sein (z. B. beim Abtauen). Als UINT32 gelesen wird daraus 2^32/10 - x.
+            # Die Registerliste ab Firmware 2.2.0.1 (docs/20260521 2.2.0.1 Registerliste - Heliotherm.pdf) gibt für IR 74/75 INT32 an.
+            C_WMZ_LEISTUNG: {"DT": C_DT_INT32,},
         },
         "add": {
             C_FWS_ZIELTEMPERATUR: {"RT": C_REG_TYPE_HOLDING_REGISTERS,"NAME":"FWS Zieltemperatur","REG":153,"DT":C_DT_INT16,"FAKTOR":0.1,"UNIT":"°C","STEP":1.0,"MIN":5.0,"MAX":65.0,"WEB_ID":"SP 87","PF":Platform.NUMBER},
