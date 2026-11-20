@@ -33,6 +33,7 @@ from .const import (
     DEFAULT_NAME,
     DEFAULT_PORT,
     DEFAULT_HOSTID,
+    DEFAULT_FIRMWARE,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     CONF_HOSTID,
@@ -103,7 +104,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     version = await hub.detect_firmware_version()
     if not version:
-        version = entry.options.get(CONF_FIRMWARE, None)
+        version = entry.options.get(
+            CONF_FIRMWARE, entry.data.get(CONF_FIRMWARE, DEFAULT_FIRMWARE)
+        )
 
     _LOGGER.info(f"Firmware-Version: {version}")
 
